@@ -1232,6 +1232,55 @@ function axion() {
     esac
 }
 
+function aX() {
+    if [[ "$1" == "help" ]]; then
+        echo "Usage: aX [b|fb] [-j<num_cores>]"
+        echo "   b   - Build bacon"
+        echo "   fb  - Fastboot update"
+        echo "   -j<num_cores>  - Specify the number of cores to use for the build"
+        return 0
+    fi
+
+    if [[ -z "$TARGET_PRODUCT" ]]; then
+        echo "Error: No device target set. Please use 'axion' or 'lunch' to set the target device."
+        return 1
+    fi
+
+    local jCount=""
+    local cmd=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -j*)
+                jCount="$1"
+                ;;
+            b|fb)
+                cmd="$1"
+                ;;
+            *)
+                echo "Error: Invalid argument mode. Please use 'b', 'fb', 'fbs', 'sb', 'sbi', 'help', or a job count flag like '-j<number>'."
+                echo "Usage: aX [b|fb] [-j<num_cores>]"
+                return 1
+                ;;
+        esac
+        shift
+    done
+
+    m installclean
+
+    case "$cmd" in
+        b)
+            m bacon ${jCount:--j$(nproc --all)}
+            ;;
+        fb)
+            m updatepackage ${jCount:--j$(nproc --all)}
+            ;;
+        "")
+            m ${jCount:--j$(nproc --all)}
+            ;;
+    esac
+}
+
 function axionSync() {
     yes y | repo init -u https://github.com/AxionAOSP/android.git -b lineage-22.1 --git-lfs
     repo sync --force-sync
