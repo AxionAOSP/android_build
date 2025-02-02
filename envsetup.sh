@@ -1232,6 +1232,11 @@ function axion() {
     esac
 }
 
+function axionSync() {
+    yes y | repo init -u https://github.com/AxionAOSP/android.git -b lineage-22.1 --git-lfs
+    repo sync --force-sync
+}
+
 validate_current_shell
 set_global_paths
 source_vendorsetup
