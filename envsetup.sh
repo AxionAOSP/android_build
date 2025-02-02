@@ -1201,6 +1201,36 @@ unset syswrite
 unset tomlgrep
 unset treegrep
 
+function axion() {
+    local device="$1"
+    local build_type="$2"
+    source ${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release
+
+    if [ -z "$device" ]; then
+        if [[ -n "$TARGET_PRODUCT" ]]; then
+            device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+            echo "No argument found for device, using TARGET_PRODUCT as device: $device"
+        else
+            echo "Correct usage: axion <device_codename> [build_type]"
+            echo "Available build types: user, userdebug, eng"
+            return 1
+        fi
+    fi
+
+    if [ -z "$build_type" ]; then
+        build_type="userdebug"
+    fi
+
+    case "$build_type" in
+        user|userdebug|eng)
+        lunch lineage_"$device"-"$aosp_target_release"-"$build_type"
+        ;;
+        *)
+        echo "Invalid build type."
+        echo "Available build types are: user, userdebug & eng"
+        ;;
+    esac
+}
 
 validate_current_shell
 set_global_paths
