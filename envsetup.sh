@@ -1286,6 +1286,93 @@ function axionSync() {
     repo sync --force-sync
 }
 
+# usage (buildInstallApp): biApp Launcher3QuickStep/SettingsGoogle etc
+function biApp() {
+    local package="$1"
+    if [[ "$package" == "L3" ]]; then
+        package="Launcher3QuickStep"
+    elif [[ "$package" == "SG" ]]; then
+        package="SettingsGoogle"
+    fi
+    m "$package"
+    iApp "$package"
+}
+
+# usage (installApp): iApp Launcher3QuickStep/SettingsGoogle etc
+function iApp() {
+    local target_device="$(get_build_var TARGET_DEVICE)"
+    local package="$1"
+    if [[ "$package" == "L3" ]]; then
+        package="Launcher3QuickStep"
+    elif [[ "$package" == "SG" ]]; then
+        package="SettingsGoogle"
+    fi
+    local apk_path=$(find "out/target/product/$target_device/" \
+        \( -path "*/system_ext/*" -o -path "*/product/*" -o -path "*/system/*" \) \
+        -type f -name "$package.apk" -print -quit)
+
+    if [[ -z "$apk_path" ]]; then
+        echo "Error: APK for package '$package' not found in system_ext, product, or system directories."
+        return 1
+    fi
+
+    echo "Installing: $apk_path"
+    adb install "$apk_path"
+}
+
+# usage: biPart system_ext/system/product/vendor
+function biPart() {
+    local partition="$1"
+    bPart "$partition"
+    iPart "$partition"
+}
+
+# usage: bPart system_ext/system/product/vendor
+function bPart() {
+    local partition="$1"
+    case "$partition" in
+        system_ext)
+            m systemextimage
+            ;;
+        product)
+            m productimage
+            ;;
+        system)
+            m systemimage
+            ;;
+        vendor)
+            m vendorimage
+            ;;
+        *)
+            echo "Error: Unknown partition '$partition'. Valid options: system_ext, product, system, vendor."
+            return 1
+            ;;
+    esac
+}
+
+# usage: iPart system_ext/system/product/vendor
+function iPart() {
+    local partition="$1"
+    local target_device="$(get_build_var TARGET_DEVICE)"
+    local img_path
+    case "$partition" in
+        system_ext|product|system|vendor)
+            img_path="out/target/product/$target_device/$partition.img"
+            ;;
+        *)
+            echo "Error: Unknown partition '$partition'. Valid options: system_ext, product, system, vendor."
+            return 1
+            ;;
+    esac
+    if [[ ! -f "$img_path" ]]; then
+        echo "Error: Image for partition '$partition' not found at $img_path."
+        return 1
+    fi
+    echo "Flashing $partition image: $img_path"
+    adb reboot fastboot
+    fastboot flash "$partition" "$img_path" && fastboot reboot
+}
+
 validate_current_shell
 set_global_paths
 source_vendorsetup
