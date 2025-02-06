@@ -1232,9 +1232,9 @@ function axion() {
     esac
 }
 
-function aX() {
+function ax() {
     if [[ "$1" == "help" ]]; then
-        echo "Usage: aX [b|fb] [-j<num_cores>]"
+        echo "Usage: ax [b|fb] [-j<num_cores>]"
         echo "   b   - Build bacon"
         echo "   fb  - Fastboot update"
         echo "   -j<num_cores>  - Specify the number of cores to use for the build"
@@ -1259,7 +1259,7 @@ function aX() {
                 ;;
             *)
                 echo "Error: Invalid argument mode. Please use 'b', 'fb', 'fbs', 'sb', 'sbi', 'help', or a job count flag like '-j<number>'."
-                echo "Usage: aX [b|fb] [-j<num_cores>]"
+                echo "Usage: ax [b|fb] [-j<num_cores>]"
                 return 1
                 ;;
         esac
