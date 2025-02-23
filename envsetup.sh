@@ -1202,17 +1202,44 @@ unset tomlgrep
 unset treegrep
 
 function axion() {
-    local device="$1"
-    local build_type="$2"
-    source ${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release
+    local device=""
+    local build_type=""
+    local variant=""
+
+    for arg in "$@"; do
+        case "$arg" in
+            gms|va)
+                if [[ -n "$variant" ]]; then
+                    echo "Error: Multiple variants specified ($variant and $arg). Only one variant can be used."
+                    return 1
+                fi
+                variant="$arg"
+                ;;
+            user|userdebug|eng)
+                if [[ -n "$build_type" ]]; then
+                    echo "Error: Multiple build types specified ($build_type and $arg). Only one build type can be used."
+                    return 1
+                fi
+                build_type="$arg"
+                ;;
+            *)
+                if [[ -n "$device" ]]; then
+                    echo "Error: Multiple device names detected ($device and $arg). Please specify only one device."
+                    return 1
+                fi
+                device="$arg"
+                ;;
+        esac
+    done
 
     if [ -z "$device" ]; then
         if [[ -n "$TARGET_PRODUCT" ]]; then
             device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
             echo "No argument found for device, using TARGET_PRODUCT as device: $device"
         else
-            echo "Correct usage: axion <device_codename> [build_type]"
+            echo "Correct usage: axion <device_codename> [build_type] [variant]"
             echo "Available build types: user, userdebug, eng"
+            echo "Available variants: gms, va"
             return 1
         fi
     fi
@@ -1221,13 +1248,28 @@ function axion() {
         build_type="userdebug"
     fi
 
+    if [ -n "$variant" ]; then
+        case "$variant" in
+            gms) export WITH_GMS=true ;;
+            va) export WITH_GMS=false ;;
+            *)
+                echo "Error: Invalid variant '$variant'. Available options: gms, va"
+                return 1
+                ;;
+        esac
+    else
+        export WITH_GMS=false
+    fi
+
+    source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
+
     case "$build_type" in
         user|userdebug|eng)
-        lunch lineage_"$device"-"$aosp_target_release"-"$build_type"
+            lunch lineage_"$device"-"$aosp_target_release"-"$build_type"
         ;;
         *)
-        echo "Invalid build type."
-        echo "Available build types are: user, userdebug & eng"
+            echo "Error: Invalid build type '$build_type'. Available options: user, userdebug, eng"
+            return 1
         ;;
     esac
 }
