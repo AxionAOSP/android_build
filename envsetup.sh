@@ -1204,16 +1204,41 @@ unset treegrep
 function axion() {
     local device=""
     local build_type=""
-    local variant=""
+    local gms_variant=""
+    local gms_enabled=false
+    local vanilla_enabled=false
 
     for arg in "$@"; do
         case "$arg" in
-            gms|va)
-                if [[ -n "$variant" ]]; then
-                    echo "Error: Multiple variants specified ($variant and $arg). Only one variant can be used."
+            gms)
+                if [[ "$gms_enabled" == true ]]; then
+                    echo "Error: GMS already specified."
                     return 1
                 fi
-                variant="$arg"
+                if [[ "$vanilla_enabled" == true ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                gms_enabled=true
+                gms_variant="core"
+                ;;
+            pico|core)
+                if [[ "$gms_enabled" != true ]]; then
+                    echo "Error: GMS variant specified without enabling GMS."
+                    return 1
+                fi
+                gms_variant="$arg"
+                ;;
+            va|vanilla)
+                if [[ "$vanilla_enabled" == true ]]; then
+                    echo "Error: Vanilla already specified."
+                    return 1
+                fi
+                if [[ "$gms_enabled" == true ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                vanilla_enabled=true
                 ;;
             user|userdebug|eng)
                 if [[ -n "$build_type" ]]; then
@@ -1237,9 +1262,10 @@ function axion() {
             device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
             echo "No argument found for device, using TARGET_PRODUCT as device: $device"
         else
-            echo "Correct usage: axion <device_codename> [build_type] [variant]"
+            echo "Correct usage: axion <device_codename> [build_type] [gms [pico|core] | va]"
             echo "Available build types: user, userdebug, eng"
-            echo "Available variants: gms, va"
+            echo "Available GMS variants: pico, core (default: core)"
+            echo "Use 'va' or 'vanilla' for a non-GMS build."
             return 1
         fi
     fi
@@ -1248,17 +1274,15 @@ function axion() {
         build_type="userdebug"
     fi
 
-    if [ -n "$variant" ]; then
-        case "$variant" in
-            gms) export WITH_GMS=true ;;
-            va) export WITH_GMS=false ;;
-            *)
-                echo "Error: Invalid variant '$variant'. Available options: gms, va"
-                return 1
-                ;;
-        esac
+    if [[ "$gms_enabled" == true ]]; then
+        export WITH_GMS=true
+        export WITH_GMS_VARIANT="$gms_variant"
+    elif [[ "$vanilla_enabled" == true ]]; then
+        export WITH_GMS=false
+        unset WITH_GMS_VARIANT
     else
         export WITH_GMS=false
+        unset WITH_GMS_VARIANT
     fi
 
     source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
