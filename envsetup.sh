@@ -1348,7 +1348,7 @@ function ax() {
 }
 
 function axionSync() {
-    yes y | repo init -u https://github.com/AxionAOSP/android.git -b lineage-22.1 --git-lfs
+    yes y | repo init -u https://github.com/AxionAOSP/android.git -b lineage-22.2 --git-lfs
     repo sync --force-sync
 }
 
