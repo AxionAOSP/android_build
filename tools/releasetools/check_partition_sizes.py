@@ -57,7 +57,8 @@ class Expression(object):
       logger.info("%s is less than or equal to %s:\n%s == %d <= %s == %d",
                   *format_args)
     else:
-      msg = "{} is greater than {}:\n{} == {} > {} == {}".format(*format_args)
+      msg = ("If setting \"SOONG_RUSTC_INCREMENTAL\" try building without it. "
+             "{} is greater than {}:\n{} == {} > {} == {}".format(*format_args))
       if level == logging.ERROR:
         raise RuntimeError(msg)
       else:
