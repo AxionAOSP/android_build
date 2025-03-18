@@ -1627,6 +1627,13 @@ function rcleanup() {
     croot
 }
 
+function setup_keys() {
+    if [[ ! -d vendor/lineage-priv/keys ]]; then
+        gk -s
+    fi
+}
+
+setup_keys
 setup_ccache
 validate_current_shell
 set_global_paths
