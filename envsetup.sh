@@ -1300,9 +1300,10 @@ function axion() {
 
 function ax() {
     if [[ "$1" == "help" ]]; then
-        echo "Usage: ax [b|fb] [-j<num_cores>]"
+        echo "Usage: ax [b|fb|br] [-j<num_cores>]"
         echo "   b   - Build bacon"
         echo "   fb  - Fastboot update"
+        echo "   br  - Run brunch <device>"
         echo "   -j<num_cores>  - Specify the number of cores to use for the build"
         return 0
     fi
@@ -1320,12 +1321,12 @@ function ax() {
             -j*)
                 jCount="$1"
                 ;;
-            b|fb)
+            b|fb|br)
                 cmd="$1"
                 ;;
             *)
-                echo "Error: Invalid argument mode. Please use 'b', 'fb', 'fbs', 'sb', 'sbi', 'help', or a job count flag like '-j<number>'."
-                echo "Usage: ax [b|fb] [-j<num_cores>]"
+                echo "Error: Invalid argument mode. Please use 'b', 'fb', 'br', or a job count flag like '-j<number>'."
+                echo "Usage: ax [b|fb|br] [-j<num_cores>]"
                 return 1
                 ;;
         esac
@@ -1333,6 +1334,13 @@ function ax() {
     done
 
     m installclean
+
+    if [[ "$cmd" == "br" ]]; then
+        local device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+        echo "Running brunch for device: $device with $jCount"
+        brunch "$device" ${jCount:--j$(nproc --all)}
+        return
+    fi
 
     case "$cmd" in
         b)
