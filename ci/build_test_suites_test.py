@@ -257,9 +257,9 @@ class BuildPlannerTest(unittest.TestCase):
   class TestOptimizedBuildTarget(optimized_targets.OptimizedBuildTarget):
 
     def __init__(
-        self, target, build_context, args, output_targets, packaging_commands
+        self, target, build_context, args, test_infos, output_targets, packaging_commands
     ):
-      super().__init__(target, build_context, args)
+      super().__init__(target, build_context, args, test_infos)
       self.output_targets = output_targets
       self.packaging_commands = packaging_commands
 

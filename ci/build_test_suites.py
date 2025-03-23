@@ -16,6 +16,7 @@
 
 import argparse
 from dataclasses import dataclass
+from collections import defaultdict
 import json
 import logging
 import os
@@ -68,6 +69,7 @@ class BuildPlanner:
     self.build_context = build_context
     self.args = args
     self.target_optimizations = target_optimizations
+    self.target_to_test_infos = defaultdict(list)
 
   def create_build_plan(self):
 
@@ -102,7 +104,7 @@ class BuildPlanner:
         continue
 
       target_optimizer = target_optimizer_getter(
-          target, self.build_context, self.args
+          target, self.build_context, self.args, self.target_to_test_infos[target]
       )
       build_targets.update(target_optimizer.get_build_targets())
       packaging_commands_getters.append(
@@ -178,6 +180,10 @@ class BuildPlanner:
       tf_command = self._build_tf_command(test_info)
       discovery_agent = test_discovery_agent.TestDiscoveryAgent(tradefed_args=tf_command)
       for regex in discovery_agent.discover_test_zip_regexes():
+        for target in self.args.extra_targets:
+          target_regex = r'\b(%s.*)\b' % re.escape(target)
+          if re.search(target_regex, regex):
+            self.target_to_test_infos[target].append(test_info)
         build_target_regexes.add(regex)
     return build_target_regexes
 

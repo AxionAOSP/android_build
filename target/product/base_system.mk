@@ -395,10 +395,6 @@ PRODUCT_PACKAGES += \
     system_manifest.xml \
     system_compatibility_matrix.xml \
 
-# Base modules when shipping api level is less than or equal to 34
-PRODUCT_PACKAGES_SHIPPING_API_LEVEL_34 += \
-    android.hidl.memory@1.0-impl \
-
 # hwservicemanager is now installed on system_ext, but apexes might be using
 # old libraries that are expecting it to be installed on system. This allows
 # those apexes to continue working. The symlink can be removed once we are sure
@@ -585,4 +581,4 @@ $(call soong_config_set, SettingsLib, legacy_avatar_picker_app_enabled, $(if $(R
 $(call soong_config_set, appsearch, enable_isolated_storage, $(RELEASE_APPSEARCH_ENABLE_ISOLATED_STORAGE))
 
 # Enable AppSearch Isolated Storage per BUILD flag
-PRODUCT_PRODUCT_PROPERTIES += appsearch.feature.enable_isolated_storage=$(RELEASE_APPSEARCH_ENABLE_ISOLATED_STORAGE)
+PRODUCT_PRODUCT_PROPERTIES += ro.appsearch.feature.enable_isolated_storage=$(RELEASE_APPSEARCH_ENABLE_ISOLATED_STORAGE)

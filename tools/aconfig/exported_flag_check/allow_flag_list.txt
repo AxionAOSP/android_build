@@ -391,3 +391,10 @@ vendor.gc2.flags.mse_report
 vendor.google.plat_security.flags.enable_service
 vendor.google.plat_security.flags.enable_trusty_service
 vendor.google.wireless_charger.service.flags.enable_service
+
+android.hardware.biometrics.move_fm_api_to_bm
+android.hardware.serial.flags.enable_serial_api
+com.android.providers.media.flags.enable_local_media_provider_capabilities
+com.android.providers.media.flags.enable_photopicker_datescrubber
+com.android.system.virtualmachine.flags.terminal_storage_balloon
+com.android.tradeinmode.flags.trade_in_mode_2025q4

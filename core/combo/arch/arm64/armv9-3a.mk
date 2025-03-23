@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2019 The Android Open Source Project
+# Copyright (C) 2025 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,5 @@
 # limitations under the License.
 #
 
-# This makefile contains the system_ext partition contents for
-# media-capable devices (non-wearables). Only add something here
-# if it definitely doesn't belong on wearables. Otherwise, choose
-# base_system_ext.mk.
-$(call inherit-product, $(SRC_TARGET_DIR)/product/base_system_ext.mk)
-
-PRODUCT_PACKAGES += \
-    StatementService \
-
-# Window Extensions
-$(call inherit-product, $(SRC_TARGET_DIR)/product/window_extensions_base.mk)
+# .mk file required to support build for the ARMv9.3-A arch variant.
+# The file just needs to be present, it does not need to contain anything.

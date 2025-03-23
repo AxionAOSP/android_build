@@ -6048,7 +6048,7 @@ ifneq (,$(strip $(BOARD_AVB_VBMETA_VENDOR)))
 	$(hide) echo "avb_vbmeta_vendor_rollback_index_location=$(BOARD_AVB_VBMETA_VENDOR_ROLLBACK_INDEX_LOCATION)" >> $@
 endif # BOARD_AVB_VBMETA_VENDOR_KEY_PATH
 ifneq (,$(strip $(BOARD_AVB_VBMETA_CUSTOM_PARTITIONS)))
-	$(hide) echo "avb_custom_vbmeta_images_partition_list=$(BOARD_AVB_VBMETA_CUSTOM_PARTITIONS)" >> $@
+	$(hide) echo "avb_custom_vbmeta_images_partition_list=$(sort $(BOARD_AVB_VBMETA_CUSTOM_PARTITIONS))" >> $@
 	$(hide) $(foreach partition,$(BOARD_AVB_VBMETA_CUSTOM_PARTITIONS),\
 	echo "avb_vbmeta_$(partition)=$(BOARD_AVB_VBMETA_$(call to-upper,$(partition)))" >> $@ ;\
 	echo "avb_vbmeta_$(partition)_args=$(BOARD_AVB_MAKE_VBMETA_$(call to-upper,$(partition))_IMAGE_ARGS)" >> $@ ;\
@@ -6119,6 +6119,7 @@ endif
 ifneq ($(BOARD_PARTIAL_OTA_UPDATE_PARTITIONS_LIST),)
 	$(hide) echo "partial_ota_update_partitions_list=$(BOARD_PARTIAL_OTA_UPDATE_PARTITIONS_LIST)" >> $@
 endif
+	$(hide) sort -o $@ $@
 
 $(call declare-0p-target,$(INSTALLED_FASTBOOT_INFO_TARGET))
 
@@ -7602,6 +7603,12 @@ $(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(IMG_FROM_TARG
 	PATH=$(INTERNAL_USERIMAGES_BINARY_PATHS):$(dir $(ZIP2ZIP)):$$PATH \
 	    $(IMG_FROM_TARGET_FILES) \
 	        --additional IMAGES/VerifiedBootParams.textproto:VerifiedBootParams.textproto \
+			$(foreach partition,$(BOARD_CUSTOMIMAGES_PARTITION_LIST), \
+					$(if $(BOARD_$(call to-upper,$(partition))_IMAGE_NO_FLASHALL), \
+						--exclude IMAGES/$(partition).img \
+						--exclude IMAGES/$(partition).map \
+					) \
+			) \
 	        --build_super_image $(BUILD_SUPER_IMAGE) \
 	        $(BUILT_TARGET_FILES_PACKAGE) $@
 

@@ -26,6 +26,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead};
 
+const SDK_INT_MULTIPLIER: u32 = 100_000;
+
 /// Just the fully qualified flag name (package_name.flag_name).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct FinalizedFlag {
@@ -38,6 +40,9 @@ pub struct FinalizedFlag {
 /// API level in which the flag was finalized.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ApiLevel(pub i32);
+
+/// API level of the extended flags file of version 35
+pub const EXTENDED_FLAGS_35_APILEVEL: ApiLevel = ApiLevel(35);
 
 /// Contains all flags finalized for a given API level.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -78,6 +83,26 @@ impl FinalizedFlagMap {
     }
 }
 
+#[allow(dead_code)] // TODO: b/378936061: Use with SDK_INT_FULL check.
+fn parse_full_version(version: String) -> Result<u32> {
+    let (major, minor) = if let Some(decimal_index) = version.find('.') {
+        (version[..decimal_index].parse::<u32>()?, version[decimal_index + 1..].parse::<u32>()?)
+    } else {
+        (version.parse::<u32>()?, 0)
+    };
+
+    if major >= 21474 {
+        return Err(anyhow!("Major version too large, must be less than 21474."));
+    }
+    if minor >= SDK_INT_MULTIPLIER {
+        return Err(anyhow!("Minor version too large, must be less than {}.", SDK_INT_MULTIPLIER));
+    }
+
+    Ok(major * SDK_INT_MULTIPLIER + minor)
+}
+
+const EXTENDED_FLAGS_LIST_35: &str = "extended_flags_list_35.txt";
+
 /// Converts a string to an int. Will parse to int even if the string is "X.0".
 /// Returns error for "X.1".
 fn str_to_api_level(numeric_string: &str) -> Result<ApiLevel> {
@@ -117,28 +142,47 @@ pub fn read_files_to_map_using_path(flag_files: Vec<String>) -> Result<Finalized
             continue;
         };
 
-        let file = fs::File::open(flag_file)?;
-        let reader = io::BufReader::new(file);
+        let file = fs::File::open(&flag_file)?;
 
-        for qualified_flag_name in reader.lines() {
-            // Split the qualified flag name into package and flag name:
-            // com.my.package.name.my_flag_name -> ['com.my.package.name', 'my_flag_name'].
-            let mut flag: Vec<String> =
-                qualified_flag_name?.rsplitn(2, '.').map(|s| s.to_string()).collect();
-
-            if flag.len() != 2 {
-                continue;
-            }
-
-            let package_name = flag.pop().ok_or(anyhow!("Missing flag package."))?;
-            let flag_name = flag.pop().ok_or(anyhow!("Missing flag name."))?;
-
-            // Only add the flag if it wasn't added in a prior file.
-            data_map.insert_if_new(api_level, FinalizedFlag { flag_name, package_name });
-        }
+        io::BufReader::new(file).lines().for_each(|flag| {
+            let flag =
+                flag.unwrap_or_else(|_| panic!("Failed to read line from file {}", flag_file));
+            let finalized_flag = build_finalized_flag(&flag)
+                .unwrap_or_else(|_| panic!("cannot build finalized flag {}", flag));
+            data_map.insert_if_new(api_level, finalized_flag);
+        });
     }
 
     Ok(data_map)
+}
+
+/// Read the qualified flag names into a FinalizedFlag set
+pub fn read_extend_file_to_map_using_path(extened_file: String) -> Result<HashSet<FinalizedFlag>> {
+    let (_, file_name) =
+        extened_file.rsplit_once('/').ok_or(anyhow!("Invalid file: '{}'", extened_file))?;
+    if file_name != EXTENDED_FLAGS_LIST_35 {
+        return Err(anyhow!("Provided incorrect file, must be {}", EXTENDED_FLAGS_LIST_35));
+    }
+    let file = fs::File::open(extened_file)?;
+    let extended_flags = io::BufReader::new(file)
+        .lines()
+        .map(|flag| {
+            let flag = flag.expect("Failed to read line from extended file");
+            build_finalized_flag(&flag)
+                .unwrap_or_else(|_| panic!("cannot build finalized flag {}", flag))
+        })
+        .collect::<HashSet<FinalizedFlag>>();
+    Ok(extended_flags)
+}
+
+fn build_finalized_flag(qualified_flag_name: &String) -> Result<FinalizedFlag> {
+    // Split the qualified flag name into package and flag name:
+    // com.my.package.name.my_flag_name -> ('com.my.package.name', 'my_flag_name')
+    let (package_name, flag_name) = qualified_flag_name
+        .rsplit_once('.')
+        .ok_or(anyhow!("Invalid qualified flag name format: '{}'", qualified_flag_name))?;
+
+    Ok(FinalizedFlag { flag_name: flag_name.to_string(), package_name: package_name.to_string() })
 }
 
 #[cfg(test)]
@@ -391,5 +435,129 @@ mod tests {
 
         assert_eq!(map.get_finalized_level(&flags[0]).unwrap(), l35);
         assert_eq!(map.get_finalized_level(&flags[1]).unwrap(), l36);
+    }
+
+    #[test]
+    fn test_read_flag_from_extended_file() {
+        let flags = create_test_flags();
+
+        // Create the file <temp_dir>/35/extended_flags_list_35.txt
+        let temp_dir = tempdir().unwrap();
+        let mut file_path = temp_dir.path().to_path_buf();
+        file_path.push("35");
+        fs::create_dir_all(&file_path).unwrap();
+        file_path.push(EXTENDED_FLAGS_LIST_35);
+        let mut file = File::create(&file_path).unwrap();
+
+        // Write all flags to the file.
+        add_flags_to_file(&mut file, &[flags[0].clone(), flags[1].clone()]);
+
+        let flags_set =
+            read_extend_file_to_map_using_path(file_path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(flags_set.len(), 2);
+        assert!(flags_set.contains(&flags[0]));
+        assert!(flags_set.contains(&flags[1]));
+    }
+
+    #[test]
+    fn test_read_flag_from_wrong_extended_file_err() {
+        let flags = create_test_flags();
+
+        // Create the file <temp_dir>/35/extended_flags_list.txt
+        let temp_dir = tempdir().unwrap();
+        let mut file_path = temp_dir.path().to_path_buf();
+        file_path.push("35");
+        fs::create_dir_all(&file_path).unwrap();
+        file_path.push("extended_flags_list.txt");
+        let mut file = File::create(&file_path).unwrap();
+
+        // Write all flags to the file.
+        add_flags_to_file(&mut file, &[flags[0].clone(), flags[1].clone()]);
+
+        let err = read_extend_file_to_map_using_path(file_path.to_string_lossy().to_string())
+            .unwrap_err();
+        assert_eq!(
+            format!("{:?}", err),
+            "Provided incorrect file, must be extended_flags_list_35.txt"
+        );
+    }
+
+    #[test]
+    fn test_parse_full_version_correct_input_major_dot_minor() {
+        let version = parse_full_version("12.34".to_string());
+
+        assert!(version.is_ok());
+        assert_eq!(version.unwrap(), 1_200_034);
+    }
+
+    #[test]
+    fn test_parse_full_version_correct_input_omit_dot_minor() {
+        let version = parse_full_version("1234".to_string());
+
+        assert!(version.is_ok());
+        assert_eq!(version.unwrap(), 123_400_000);
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_empty_string() {
+        let version = parse_full_version("".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_no_numbers_in_string() {
+        let version = parse_full_version("hello".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_unexpected_patch_version() {
+        let version = parse_full_version("1.2.3".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_leading_dot_missing_major_version() {
+        let version = parse_full_version(".1234".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_trailing_dot_missing_minor_version() {
+        let version = parse_full_version("1234.".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_negative_major_version() {
+        let version = parse_full_version("-12.34".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_negative_minor_version() {
+        let version = parse_full_version("12.-34".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_major_version_too_large() {
+        let version = parse_full_version("40000.1".to_string());
+
+        assert!(version.is_err());
+    }
+
+    #[test]
+    fn test_parse_full_version_incorrect_input_minor_version_too_large() {
+        let version = parse_full_version("3.99999999".to_string());
+
+        assert!(version.is_err());
     }
 }
