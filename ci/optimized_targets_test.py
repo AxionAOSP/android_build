@@ -44,6 +44,7 @@ class GeneralTestsOptimizerTest(fake_filesystem_unittest.TestCase):
 
   def _setup_working_build_env(self):
     self._write_soong_ui_file()
+    self._write_change_info_file()
     self._host_out_testcases = pathlib.Path('/tmp/top/host_out_testcases')
     self._host_out_testcases.mkdir(parents=True)
     self._target_out_testcases = pathlib.Path('/tmp/top/target_out_testcases')
@@ -62,8 +63,46 @@ class GeneralTestsOptimizerTest(fake_filesystem_unittest.TestCase):
     self.mock_os_environ.update({
         'TOP': '/tmp/top',
         'DIST_DIR': '/tmp/top/out/dist',
-        'TMPDIR': '/tmp/'
+        'TMPDIR': '/tmp/',
+        'CHANGE_INFO': '/tmp/top/change_info'
     })
+
+  def _write_change_info_file(self):
+    change_info_path = pathlib.Path('/tmp/top/')
+    with open(os.path.join(change_info_path, 'change_info'), 'w') as f:
+      f.write("""
+    {
+      "changes": [
+        {
+          "projectPath": "build/ci",
+          "revisions": [
+            {
+              "revisionNumber": 1,
+              "fileInfos": [
+                {
+                  "path": "src/main/java/com/example/MyClass.java",
+                  "action": "MODIFIED"
+                },
+                {
+                  "path": "src/test/java/com/example/MyClassTest.java",
+                  "action": "ADDED"
+                }
+              ]
+            },
+            {
+              "revisionNumber": 2,
+              "fileInfos": [
+                {
+                  "path": "src/main/java/com/example/AnotherClass.java",
+                  "action": "MODIFIED"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    """)
 
   def _write_soong_ui_file(self):
     soong_path = pathlib.Path('/tmp/top/build/soong')

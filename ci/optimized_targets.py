@@ -207,6 +207,19 @@ class ChangeInfo:
 
     self._change_info_contents = change_info_contents
 
+  def get_changed_paths(self) -> set[str]:
+    changed_paths = set()
+    for change in self._change_info_contents['changes']:
+      project_path = change.get('projectPath') + '/'
+
+      for revision in change.get('revisions'):
+        for file_info in revision.get('fileInfos'):
+          file_path = file_info.get('path')
+          dir_path = os.path.dirname(file_path)
+          changed_paths.add(project_path + dir_path)
+
+    return changed_paths
+
   def find_changed_files(self) -> set[str]:
     changed_files = set()
 
@@ -266,9 +279,11 @@ class GeneralTestsOptimizer(OptimizedBuildTarget):
 
 
   def _get_test_discovery_modules(self) -> set[str]:
+    change_info = ChangeInfo(os.environ.get('CHANGE_INFO'))
+    change_paths = change_info.get_changed_paths()
     test_modules = set()
     for test_info in self.test_infos:
-      tf_command = self._build_tf_command(test_info)
+      tf_command = self._build_tf_command(test_info, change_paths)
       discovery_agent = test_discovery_agent.TestDiscoveryAgent(tradefed_args=tf_command, test_mapping_zip_path=os.environ.get('DIST_DIR')+'/test_mappings.zip')
       modules, dependencies = discovery_agent.discover_test_mapping_test_modules()
       for regex in modules:
@@ -276,7 +291,7 @@ class GeneralTestsOptimizer(OptimizedBuildTarget):
     return test_modules
 
 
-  def _build_tf_command(self, test_info) -> list[str]:
+  def _build_tf_command(self, test_info, change_paths) -> list[str]:
     command = [test_info.command]
     for extra_option in test_info.extra_options:
       if not extra_option.get('key'):
@@ -292,6 +307,10 @@ class GeneralTestsOptimizer(OptimizedBuildTarget):
           command.append(value)
       else:
         command.append(arg_key)
+    if test_info.is_test_mapping:
+      for change_path in change_paths:
+        command.append('--test-mapping-path')
+        command.append(change_path)
 
     return command
 

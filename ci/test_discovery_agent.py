@@ -118,15 +118,18 @@ class TestDiscoveryAgent:
       )
       java_args.extend(self.tradefed_args)
       env = os.environ.copy()
+      env.update({"SKIP_JAVA_QUERY": "1"})
+      env.update({"ALLOW_EMPTY_TEST_MAPPING": "1"})
       env.update({"TF_TEST_MAPPING_ZIP_FILE": self.test_mapping_zip_path})
       env.update({"DISCOVERY_OUTPUT_FILE": test_discovery_output_file.name})
       logging.info(f"Calling test discovery with args: {java_args}")
       try:
-        result = subprocess.run(args=java_args, env=env, text=True, check=True)
+        result = subprocess.run(args=java_args, env=env, text=True, check=True, stdout = subprocess.PIPE,
+    stderr = subprocess.PIPE)
         logging.info(f"Test discovery agent output: {result.stdout}")
       except subprocess.CalledProcessError as e:
         raise TestDiscoveryError(
-            f"Failed to run test discovery, strout: {e.stdout}, strerr:"
+            f"Failed to run test discovery, stdout: {e.stdout}, stderr:"
             f" {e.stderr}, returncode: {e.returncode}"
         )
       data = json.loads(test_discovery_output_file.read())
