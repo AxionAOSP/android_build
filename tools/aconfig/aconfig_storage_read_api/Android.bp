@@ -12,7 +12,6 @@ rust_defaults {
         "libmemmap2",
         "libcxx",
         "libthiserror",
-        "libaconfig_storage_file",
     ],
 }
 
@@ -21,6 +20,9 @@ rust_library {
     crate_name: "aconfig_storage_read_api",
     host_supported: true,
     defaults: ["aconfig_storage_read_api.defaults"],
+    rustlibs: [
+        "libaconfig_storage_file",
+    ],
     apex_available: [
         "//apex_available:platform",
         "//apex_available:anyapex",
@@ -28,12 +30,29 @@ rust_library {
     min_sdk_version: "29",
 }
 
+rust_library {
+    name: "libaconfig_storage_read_api_with_test_utils",
+    crate_name: "aconfig_storage_read_api",
+    host_supported: true,
+    defaults: ["aconfig_storage_read_api.defaults"],
+    rustlibs: [
+        "libaconfig_storage_file_with_test_utils",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "//apex_available:anyapex",
+    ],
+    min_sdk_version: "29",
+}
+
+
 rust_test_host {
     name: "aconfig_storage_read_api.test",
     test_suites: ["general-tests"],
     defaults: ["aconfig_storage_read_api.defaults"],
     rustlibs: [
         "librand",
+        "libaconfig_storage_file_with_test_utils",
     ],
     data: [
         "tests/data/v1/package_v1.map",
@@ -69,6 +88,9 @@ rust_ffi_static {
     vendor_available: true,
     product_available: true,
     defaults: ["aconfig_storage_read_api.defaults"],
+    rustlibs: [
+        "libaconfig_storage_file",
+    ],
     apex_available: [
         "//apex_available:platform",
         "//apex_available:anyapex",

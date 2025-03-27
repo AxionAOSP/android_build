@@ -14,7 +14,6 @@ rust_defaults {
         "libprotobuf",
         "libserde",
         "libserde_json",
-        "libtempfile",
         "libtinytemplate",
     ],
 }
@@ -43,6 +42,9 @@ rust_test_host {
     defaults: ["convert_finalized_flags.defaults"],
     test_suites: ["general-tests"],
     srcs: ["src/lib.rs"],
+    rustlibs: [
+        "libtempfile",
+    ],
 }
 
 genrule {

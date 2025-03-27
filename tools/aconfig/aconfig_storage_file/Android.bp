@@ -9,7 +9,6 @@ rust_defaults {
     rustlibs: [
         "libanyhow",
         "libthiserror",
-        "libtempfile",
         "libprotobuf",
         "libclap",
         "libcxx",
@@ -33,6 +32,20 @@ rust_library {
     product_available: true,
 }
 
+rust_library {
+    name: "libaconfig_storage_file_with_test_utils",
+    crate_name: "aconfig_storage_file",
+    features: [
+        "test_utils",
+    ],
+    host_supported: true,
+    defaults: ["aconfig_storage_file.defaults"],
+    srcs: ["src/lib.rs"],
+    rustlibs: [
+        "libtempfile",
+    ],
+}
+
 rust_binary_host {
     name: "aconfig-storage",
     defaults: ["aconfig_storage_file.defaults"],
@@ -48,6 +61,9 @@ rust_test_host {
     test_suites: ["general-tests"],
     defaults: ["aconfig_storage_file.defaults"],
     srcs: ["src/lib.rs"],
+    rustlibs: [
+        "libtempfile",
+    ],
 }
 
 rust_protobuf {

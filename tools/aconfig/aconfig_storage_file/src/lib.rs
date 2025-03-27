@@ -38,6 +38,7 @@ pub mod flag_value;
 pub mod package_table;
 pub mod protos;
 pub mod sip_hasher13;
+#[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
 
 use anyhow::anyhow;
