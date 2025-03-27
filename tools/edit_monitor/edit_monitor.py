@@ -73,6 +73,10 @@ class ClearcutEventHandler(PatternMatchingEventHandler):
   def on_modified(self, event: FileSystemEvent):
     self._log_edit_event(event, edit_event_pb2.EditEvent.MODIFY)
 
+  def dispatch(self, event: FileSystemEvent) -> None:
+    if event.event_type in ("moved", "created", "deleted", "modified"):
+        super().dispatch(event)
+
   def flushall(self):
     logging.info("flushing all pending events.")
     if self._scheduled_log_thread:

@@ -376,3 +376,11 @@ endif
 ifneq ($(wildcard bootable/deprecated-ota/applypatch),)
   $(call soong_config_set_bool,otatools,use_bootable_deprecated_ota_applypatch,true)
 endif
+
+# Flags used in building continuous_native_tests
+ifeq ($(BOARD_IS_AUTOMOTIVE), true)
+  $(call soong_config_set_bool,ANDROID,board_is_automotive,true)
+endif
+ifneq ($(filter vendor/google/darwinn,$(PRODUCT_SOONG_NAMESPACES)),)
+  $(call soong_config_set_bool,ci_tests,uses_darwinn_tests,true)
+endif
