@@ -1296,61 +1296,102 @@ function axion() {
             return 1
         ;;
     esac
+    
+    ax_help
+}
+
+function ax_help() {
+    local BOLD="\e[1m"
+    local GREEN="\e[32m"
+    local YELLOW="\e[33m"
+    local CYAN="\e[36m"
+    local RESET="\e[0m"
+
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
+    echo -e "${BOLD}${CYAN}          BUILDING INSTRUCTIONS          ${RESET}"
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
+    echo
+    echo -e "Use ${YELLOW}axion${RESET} instead of ${YELLOW}lunch${RESET}."
+    echo
+    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [pico|core] | vanilla]${RESET}"
+    echo
+    echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
+    echo
+    echo -e "${BOLD}Build Types:${RESET}"
+    echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
+    echo -e "  ${YELLOW}-fb${RESET}  ${CYAN}Fastboot${RESET}"
+    echo -e "  ${YELLOW}-br${RESET}  ${CYAN}Brunch${RESET}"
+    echo
+    echo -e "${BOLD}Build Options:${RESET}"
+    echo -e "  ${YELLOW}-j<num>${RESET}  ${CYAN}Job count${RESET}"
+    echo -e "  ${YELLOW}user | eng | userdebug${RESET}  ${CYAN}Build variant${RESET}"
+    echo
+    echo -e "${BOLD}Defaults:${RESET}"
+    echo -e "  ${YELLOW}Job count${RESET}  ${CYAN}-j$(nproc --all)${RESET}"
+    echo -e "  ${YELLOW}Build variant${RESET}  ${CYAN}userdebug${RESET}"
+    echo -e "  ${YELLOW}Build type${RESET}  ${CYAN}m${RESET}"
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
 }
 
 function ax() {
     if [[ "$1" == "help" ]]; then
-        echo "Usage: ax [b|fb|br] [-j<num_cores>]"
-        echo "   b   - Build bacon"
-        echo "   fb  - Fastboot update"
-        echo "   br  - Run brunch <device>"
-        echo "   -j<num_cores>  - Specify the number of cores to use for the build"
+        ax_help
         return 0
-    fi
-
-    if [[ -z "$TARGET_PRODUCT" ]]; then
-        echo "Error: No device target set. Please use 'axion' or 'lunch' to set the target device."
-        return 1
     fi
 
     local jCount=""
     local cmd=""
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -j*)
-                jCount="$1"
-                ;;
-            b|fb|br)
-                cmd="$1"
-                ;;
-            *)
-                echo "Error: Invalid argument mode. Please use 'b', 'fb', 'br', or a job count flag like '-j<number>'."
-                echo "Usage: ax [b|fb|br] [-j<num_cores>]"
-                return 1
-                ;;
-        esac
-        shift
+    local variant=""
+    local device=""
+    
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^-j[0-9]+$ ]]; then
+            jCount="$arg"
+        elif [[ "$arg" =~ ^-(b|fb|br)$ ]]; then
+            cmd="${arg:1}"
+        elif [[ "$arg" =~ ^(user|eng|userdebug)$ ]]; then
+            variant="$arg"
+        else
+            device="$arg"
+        fi
     done
+
+    jCount="${jCount:--j$(nproc --all)}"
+
+    if [[ -n "$device" ]]; then
+        export TARGET_PRODUCT="lineage_$device"
+        echo "Setting target device to $device"
+    elif [[ -z "$TARGET_PRODUCT" ]]; then
+        echo "Error: No device target set. Please use 'axion' or 'lunch' to set the target device."
+        return 1
+    fi
+
+    if [[ -n "$variant" ]]; then
+        export TARGET_BUILD_VARIANT="$variant"
+        echo "Setting build variant to $variant"
+    fi
 
     m installclean
 
+    if [[ -z "$cmd" ]]; then
+        echo "Running default 'm' build with $jCount"
+        m "$jCount"
+        return
+    fi
+
     if [[ "$cmd" == "br" ]]; then
-        local device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
-        echo "Running brunch for device: $device with $jCount"
-        brunch "$device" ${jCount:--j$(nproc --all)}
+        local targetDevice=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+        echo "Running brunch for device: $targetDevice with $jCount"
+        brunch "$targetDevice" "$TARGET_BUILD_VARIANT" "$jCount"
         return
     fi
 
     case "$cmd" in
         b)
-            m bacon ${jCount:--j$(nproc --all)}
+            m bacon "$jCount"
             ;;
         fb)
-            m updatepackage ${jCount:--j$(nproc --all)}
-            ;;
-        "")
-            m ${jCount:--j$(nproc --all)}
+            m updatepackage "$jCount"
             ;;
     esac
 }
@@ -1377,7 +1418,7 @@ function iApp() {
     local target_device="$(get_build_var TARGET_DEVICE)"
     local package="$1"
     if [[ "$package" == "L3" ]]; then
-        package="Launcher3QuickStep"
+        package="TrebuchetQuickStep"
     elif [[ "$package" == "SG" ]]; then
         package="SettingsGoogle"
     fi
@@ -1647,6 +1688,7 @@ validate_current_shell
 set_global_paths
 source_vendorsetup
 addcompletions
+ax_help
 
 export ANDROID_BUILD_TOP=$(gettop)
 export ANDROID_KEY_PATH="$ANDROID_BUILD_TOP/vendor/lineage-priv/keys"
