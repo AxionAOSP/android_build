@@ -22,12 +22,12 @@ pub mod package_table;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 
-use crate::commands::compute_flags_fingerprint;
+use crate::commands::{compute_flags_fingerprint, should_include_flag};
 use crate::storage::{
     flag_info::create_flag_info, flag_table::create_flag_table, flag_value::create_flag_value,
     package_table::create_package_table,
 };
-use aconfig_protos::{ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag, ProtoParsedFlags};
+use aconfig_protos::{ProtoParsedFlag, ProtoParsedFlags};
 use aconfig_storage_file::StorageFileType;
 
 #[derive(Clone)]
@@ -76,12 +76,7 @@ where
             }
 
             // Exclude system/vendor/product flags that are RO+disabled.
-            if (parsed_flag.container == Some("system".to_string())
-                || parsed_flag.container == Some("vendor".to_string())
-                || parsed_flag.container == Some("product".to_string()))
-                && parsed_flag.permission == Some(ProtoFlagPermission::READ_ONLY.into())
-                && parsed_flag.state == Some(ProtoFlagState::DISABLED.into())
-            {
+            if !should_include_flag(parsed_flag) {
                 continue;
             }
 
