@@ -1691,6 +1691,54 @@ function generate_host_overrides() {
     echo "BUILD_HOSTNAME=$BUILD_HOSTNAME"
 }
 
+function cpo {
+    local device="${LINEAGE_BUILD}"
+    local output_dir="out/target/product/$device"
+    local dest_dir="$HOME/ROM"
+
+    local latest_zip
+    latest_zip=$(ls -t "$output_dir"/*.zip 2>/dev/null | head -n 1)
+
+    if [[ -z "$latest_zip" ]]; then
+        echo "No zip file found in $output_dir."
+        return 1
+    fi
+
+    mkdir -p "$dest_dir"
+
+    cp "$latest_zip" "$dest_dir" && echo "Copied $(basename "$latest_zip") to $dest_dir"
+}
+
+function bpx() {
+    function get_devices() {
+        case "$1" in
+            "6") echo "oriole raven bluejay" ;;  # Pixel 6 Series
+            "7") echo "panther cheetah lynx" ;;  # Pixel 7 Series
+            "8") echo "shiba husky akita" ;;     # Pixel 8 Series
+            *) echo "oriole raven bluejay panther cheetah lynx shiba husky akita" ;;
+        esac
+    }
+
+    local devices
+    devices=$(get_devices "$1")
+
+    for device in $devices; do
+        echo "Setting up Vanilla for $device..."
+        axion "$device" va
+        echo "Building Vanilla for $device..."
+        ax -br "$device"
+        cpo
+    done
+
+    for device in $devices; do
+        echo "Setting up GMS for $device..."
+        axion "$device" gms
+        echo "Building GMS for $device..."
+        ax -br "$device"
+        cpo
+    done
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
