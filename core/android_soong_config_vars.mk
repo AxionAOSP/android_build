@@ -384,3 +384,8 @@ endif
 ifneq ($(filter vendor/google/darwinn,$(PRODUCT_SOONG_NAMESPACES)),)
   $(call soong_config_set_bool,ci_tests,uses_darwinn_tests,true)
 endif
+
+# Flags used in building continuous_instrumentation_tests
+ifneq ($(filter StorageManager, $(PRODUCT_PACKAGES)),)
+  $(call soong_config_set_bool,ci_tests,uses_storage_manager_tests,true)
+endif

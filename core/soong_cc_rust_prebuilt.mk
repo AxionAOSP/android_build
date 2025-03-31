@@ -195,7 +195,6 @@ ifndef LOCAL_IS_HOST_MODULE
       ALL_MODULES.$(my_register_name).SYMBOLIC_OUTPUT_PATH := $(symbolic_output)
       ALL_MODULES.$(my_register_name).ELF_SYMBOL_MAPPING_PATH := $(elf_symbol_mapping_path)
 
-      $(eval $(call copy-unstripped-elf-file-with-mapping,$(LOCAL_SOONG_UNSTRIPPED_BINARY),$(symbolic_output),$(elf_symbol_mapping_path)))
       $(LOCAL_BUILT_MODULE): | $(symbolic_output)
 
       ifeq ($(BREAKPAD_GENERATE_SYMBOLS),true)

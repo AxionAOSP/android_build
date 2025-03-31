@@ -143,14 +143,6 @@ endif
 my_jni_lib_symbols_copy_files := $(foreach f,$(LOCAL_SOONG_JNI_LIBS_SYMBOLS),\
   $(call word-colon,1,$(f)):$(patsubst $(PRODUCT_OUT)/%,$(TARGET_OUT_UNSTRIPPED)/%,$(call word-colon,2,$(f))))
 
-$(foreach f, $(my_jni_lib_symbols_copy_files), \
-  $(eval $(call copy-unstripped-elf-file-with-mapping, \
-    $(call word-colon,1,$(f)), \
-    $(call word-colon,2,$(f)), \
-    $(patsubst $(TARGET_OUT_UNSTRIPPED)/%,$(call intermediates-dir-for,PACKAGING,elf_symbol_mapping)/%,$(call word-colon,2,$(f)).textproto)\
-  ))\
-)
-
 symbolic_outputs := $(foreach f,$(my_jni_lib_symbols_copy_files),$(call word-colon,2,$(f)))
 symbolic_mappings := $(foreach f,$(symbolic_outputs),$(patsubst $(TARGET_OUT_UNSTRIPPED)/%,$(call intermediates-dir-for,PACKAGING,elf_symbol_mapping)/%,$(f).textproto))
 ALL_MODULES.$(my_register_name).SYMBOLIC_OUTPUT_PATH := $(symbolic_outputs)

@@ -495,10 +495,6 @@ ifdef PRODUCT_INSTALL_DEBUG_POLICY_TO_SYSTEM_EXT
   endif
 endif
 
-ifndef PRODUCT_USE_DYNAMIC_PARTITIONS
-  PRODUCT_USE_DYNAMIC_PARTITIONS := $(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS)
-endif
-
 # All requirements of PRODUCT_USE_DYNAMIC_PARTITIONS falls back to
 # PRODUCT_USE_DYNAMIC_PARTITIONS if not defined.
 ifndef PRODUCT_USE_DYNAMIC_PARTITION_SIZE
@@ -532,13 +528,19 @@ ifdef OVERRIDE_PRODUCT_EXTRA_VNDK_VERSIONS
 endif
 
 ###########################################
-# APEXes are by default not compressed
+# PRODUCT_COMPRESSED_APEX: Use compressed apexes in pre-installed partitions.
+#
+# Note: this doesn't mean that all pre-installed apexes will be compressed.
+#  Whether an apex is compressed or not is controlled at apex Soong module
+#  via compresible property.
 #
 # APEX compression can be forcibly enabled (resp. disabled) by
 # setting OVERRIDE_PRODUCT_COMPRESSED_APEX to true (resp. false), e.g. by
 # setting the OVERRIDE_PRODUCT_COMPRESSED_APEX environment variable.
 ifdef OVERRIDE_PRODUCT_COMPRESSED_APEX
   PRODUCT_COMPRESSED_APEX := $(OVERRIDE_PRODUCT_COMPRESSED_APEX)
+else ifeq (,$(PRODUCT_COMPRESSED_APEX))
+  PRODUCT_COMPRESSED_APEX := true
 endif
 
 ifdef OVERRIDE_PRODUCT_DEFAULT_APEX_PAYLOAD_TYPE
