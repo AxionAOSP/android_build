@@ -1,5 +1,7 @@
 # Put some miscellaneous rules here
 
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make packaging rules)
+
 # HACK: clear LOCAL_PATH from including last build target before calling
 # intermedites-dir-for
 LOCAL_PATH := $(BUILD_SYSTEM)
@@ -7824,18 +7826,24 @@ $(INTERNAL_FINDBUGS_HTML_TARGET): $(INTERNAL_FINDBUGS_XML_TARGET)
 # -----------------------------------------------------------------
 # These are some additional build tasks that need to be run.
 ifneq ($(dont_bother),true)
-include $(sort $(wildcard $(BUILD_SYSTEM)/tasks/*.mk))
--include $(sort $(wildcard vendor/*/build/tasks/*.mk))
--include $(sort $(wildcard device/*/build/tasks/*.mk))
--include $(sort $(wildcard product/*/build/tasks/*.mk))
-# Also the project-specific tasks
--include $(sort $(wildcard vendor/*/*/build/tasks/*.mk))
--include $(sort $(wildcard device/*/*/build/tasks/*.mk))
--include $(sort $(wildcard product/*/*/build/tasks/*.mk))
-# Also add test specifc tasks
-include $(sort $(wildcard platform_testing/build/tasks/*.mk))
-include $(sort $(wildcard test/vts/tools/build/tasks/*.mk))
+task_makefiles := \
+	$(sort $(wildcard $(BUILD_SYSTEM)/tasks/*.mk)) \
+	$(sort $(wildcard vendor/*/build/tasks/*.mk)) \
+	$(sort $(wildcard device/*/build/tasks/*.mk)) \
+	$(sort $(wildcard product/*/build/tasks/*.mk)) \
+	$(sort $(wildcard vendor/*/*/build/tasks/*.mk)) \
+	$(sort $(wildcard device/*/*/build/tasks/*.mk)) \
+	$(sort $(wildcard product/*/*/build/tasks/*.mk)) \
+	$(sort $(wildcard platform_testing/build/tasks/*.mk)) \
+	$(sort $(wildcard test/vts/tools/build/tasks/*.mk))
+
+include_makefiles_total := $(words int $(task_makefiles))
+include_makefiles_inc:=
+
+$(foreach mk,$(task_makefiles),$(info [$(call inc_and_print,include_makefiles_inc)/$(include_makefiles_total)] including $(mk) ...)$(eval include $(mk)))
+
 endif
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make packaging rules)
 
 include $(BUILD_SYSTEM)/product-graph.mk
 

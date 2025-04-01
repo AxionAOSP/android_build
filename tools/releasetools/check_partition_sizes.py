@@ -29,6 +29,7 @@ Exit code is 0 if successful and non-zero if any failures.
 from __future__ import print_function
 
 import logging
+import os
 import sys
 
 import common

@@ -4,7 +4,7 @@ $(warning Either use 'envsetup.sh; m' or 'build/soong/soong_ui.bash --make-mode'
 $(error done)
 endif
 
-$(info [1/1] initializing legacy Make module parser ...)
+$(info [1/1] initializing Make module parser ...)
 
 # Absolute path of the present working direcotry.
 # This overrides the shell variable $PWD, which does not necessarily points to
@@ -235,7 +235,7 @@ $(shell $(call echo-error,$(LOCAL_MODULE_MAKEFILE),$(LOCAL_MODULE): $(1)))
 $(error done)
 endef
 
-subdir_makefiles_inc := .
+include_makefiles_inc := .
 FULL_BUILD :=
 
 ifneq ($(dont_bother),true)
@@ -266,10 +266,9 @@ endif
 
 subdir_makefiles += $(SOONG_OUT_DIR)/late-$(TARGET_PRODUCT)$(COVERAGE_SUFFIX).mk
 
-subdir_makefiles_total := $(words int $(subdir_makefiles) post finish)
-.KATI_READONLY := subdir_makefiles_total
+include_makefiles_total := $(words int $(subdir_makefiles))
 
-$(foreach mk,$(subdir_makefiles),$(info [$(call inc_and_print,subdir_makefiles_inc)/$(subdir_makefiles_total)] including $(mk) ...)$(eval include $(mk)))
+$(foreach mk,$(subdir_makefiles),$(info [$(call inc_and_print,include_makefiles_inc)/$(include_makefiles_total)] including $(mk) ...)$(eval include $(mk)))
 
 -include device/generic/goldfish/tasks/emu_img_zip.mk
 
@@ -289,11 +288,11 @@ include system/core/rootdir/create_root_structure.mk
 
 endif # dont_bother
 
-ifndef subdir_makefiles_total
-subdir_makefiles_total := $(words init post finish)
+ifndef include_makefiles_total
+include_makefiles_total := $(words init post finish)
 endif
 
-$(info [$(call inc_and_print,subdir_makefiles_inc)/$(subdir_makefiles_total)] finishing legacy Make module parsing ...)
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make module rules ...)
 
 # -------------------------------------------------------------------
 # All module makefiles have been included at this point.
@@ -514,6 +513,8 @@ endef
 define add-required-host-so-deps
 $(1): $(2)
 endef
+
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make module rules: Adding module dependencies)
 
 # Sets up dependencies such that whenever a host module is installed,
 # any other host modules listed in $(ALL_MODULES.$(m).REQUIRED_FROM_HOST) will also be installed
@@ -1189,6 +1190,8 @@ endif
 modules_to_install := $(sort $(ALL_DEFAULT_INSTALLED_MODULES))
 ALL_DEFAULT_INSTALLED_MODULES :=
 
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make packaging rules: Adding phony targets)
+
 ifdef FULL_BUILD
 #
 # Used by the cleanup logic in soong_ui to remove files that should no longer
@@ -1211,6 +1214,7 @@ $(file >$(HOST_OUT)/.installable_test_files,$(sort \
 
 test_files :=
 endif
+
 
 # Some notice deps refer to module names without prefix or arch suffix where
 # only the variants with them get built.
@@ -1713,6 +1717,8 @@ ifneq ($(UNSAFE_DISABLE_APEX_ALLOWED_DEPS_CHECK),true)
   droidcore: ${APEX_ALLOWED_DEPS_CHECK}
 endif
 
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] finishing Make packaging rules: Checking licensing and SBOM)
+
 # Create a license metadata rule per module. Could happen in base_rules.mk or
 # notice_files.mk; except, it has to happen after fix-notice-deps to avoid
 # missing dependency errors.
@@ -1840,6 +1846,44 @@ make-compliance-metadata: \
     $(SOONG_OUT_DIR)/compliance-metadata/$(TARGET_PRODUCT)/make-metadata.csv \
     $(SOONG_OUT_DIR)/compliance-metadata/$(TARGET_PRODUCT)/make-modules.csv
 
+
+# Precompute these as an optimization to not do $(findstring).
+# Normally we would unset these to save memory, but we're almost at the end of the make
+# run, so don't bother.
+$(foreach f,$(INSTALLED_PRODUCT_SYSTEM_OTHER_AVBKEY_TARGET),\
+	$(eval _is_product_system_other_avbkey.$(f):=Y) \
+)
+$(foreach f,$(event_log_tags_file),\
+	$(eval _is_event_log_tags_file.$(f):=Y) \
+)
+$(foreach f,$(INSTALLED_SYSTEM_OTHER_ODEX_MARKER),\
+	$(eval _is_system_other_odex_marker.$(f):=Y) \
+)
+$(foreach f,$(ALL_KERNEL_MODULES_BLOCKLIST),\
+	$(eval _is_kernel_modules_blocklist.$(f):=Y) \
+)
+$(foreach f,$(ALL_FSVERITY_BUILD_MANIFEST_APK),\
+	$(eval _is_fsverity_build_manifest_apk.$(f):=Y) \
+)
+$(foreach f,$(SYSTEM_LINKER_CONFIG),\
+	$(eval _is_linker_config.$(f):=Y) \
+)
+$(foreach f,$(vendor_linker_config_file),\
+	$(eval _is_linker_config.$(f):=Y) \
+)
+$(foreach f,$(product_linker_config_file),\
+	$(eval _is_linker_config.$(f):=Y) \
+)
+$(foreach f,$(PARTITION_COMPAT_SYMLINKS),\
+	$(eval _is_partition_compat_symlink.$(f):=Y) \
+)
+$(foreach f,$(ALL_FLAGS_FILES),\
+	$(eval _is_flags_file.$(f):=Y) \
+)
+$(foreach f,$(ALL_ROOTDIR_SYMLINKS),\
+	$(eval _is_rootdir_symlink.$(f):=Y) \
+)
+
 $(SOONG_OUT_DIR)/compliance-metadata/$(TARGET_PRODUCT)/make-metadata.csv:
 	rm -f $@
 	echo 'installed_file,module_path,is_soong_module,is_prebuilt_make_module,product_copy_files,kernel_module_copy_files,is_platform_generated,static_libs,whole_static_libs,license_text' >> $@
@@ -1847,22 +1891,22 @@ $(SOONG_OUT_DIR)/compliance-metadata/$(TARGET_PRODUCT)/make-metadata.csv:
 	  $(eval _module_name := $(ALL_INSTALLED_FILES.$f)) \
 	  $(eval _path_on_device := $(patsubst $(PRODUCT_OUT)/%,%,$f)) \
 	  $(eval _build_output_path := $(PRODUCT_OUT)/$(_path_on_device)) \
-	  $(eval _module_path := $(strip $(sort $(ALL_MODULES.$(_module_name).PATH)))) \
+	  $(eval _module_path := $(sort $(ALL_MODULES.$(_module_name).PATH))) \
 	  $(eval _is_soong_module := $(ALL_MODULES.$(_module_name).IS_SOONG_MODULE)) \
 	  $(eval _is_prebuilt_make_module := $(ALL_MODULES.$(_module_name).IS_PREBUILT_MAKE_MODULE)) \
 	  $(eval _product_copy_files := $(sort $(filter %:$(_path_on_device),$(product_copy_files_without_owner)))) \
 	  $(eval _kernel_module_copy_files := $(sort $(filter %$(_path_on_device),$(KERNEL_MODULE_COPY_FILES)))) \
 	  $(eval _is_build_prop := $(call is-build-prop,$f)) \
 	  $(eval _is_notice_file := $(call is-notice-file,$f)) \
-	  $(eval _is_product_system_other_avbkey := $(if $(findstring $f,$(INSTALLED_PRODUCT_SYSTEM_OTHER_AVBKEY_TARGET)),Y)) \
-	  $(eval _is_event_log_tags_file := $(if $(findstring $f,$(event_log_tags_file)),Y)) \
-	  $(eval _is_system_other_odex_marker := $(if $(findstring $f,$(INSTALLED_SYSTEM_OTHER_ODEX_MARKER)),Y)) \
-	  $(eval _is_kernel_modules_blocklist := $(if $(findstring $f,$(ALL_KERNEL_MODULES_BLOCKLIST)),Y)) \
-	  $(eval _is_fsverity_build_manifest_apk := $(if $(findstring $f,$(ALL_FSVERITY_BUILD_MANIFEST_APK)),Y)) \
-	  $(eval _is_linker_config := $(if $(findstring $f,$(SYSTEM_LINKER_CONFIG) $(vendor_linker_config_file) $(product_linker_config_file)),Y)) \
-	  $(eval _is_partition_compat_symlink := $(if $(findstring $f,$(PARTITION_COMPAT_SYMLINKS)),Y)) \
-	  $(eval _is_flags_file := $(if $(findstring $f, $(ALL_FLAGS_FILES)),Y)) \
-	  $(eval _is_rootdir_symlink := $(if $(findstring $f, $(ALL_ROOTDIR_SYMLINKS)),Y)) \
+	  $(eval _is_product_system_other_avbkey := $(_is_product_system_other_avbkey.$(f))) \
+	  $(eval _is_event_log_tags_file := $(_is_event_log_tags_file.$(f))) \
+	  $(eval _is_system_other_odex_marker := $(_is_system_other_odex_marker.$(f))) \
+	  $(eval _is_kernel_modules_blocklist := $(_is_kernel_modules_blocklist.$(f))) \
+	  $(eval _is_fsverity_build_manifest_apk := $(_is_fsverity_build_manifest_apk.$(f))) \
+	  $(eval _is_linker_config := $(_is_linker_config.$(f))) \
+	  $(eval _is_partition_compat_symlink := $(_is_partition_compat_symlink.$(f))) \
+	  $(eval _is_flags_file := $(_is_flags_file.$(f))) \
+	  $(eval _is_rootdir_symlink := $(_is_rootdir_symlink.$(f))) \
 	  $(eval _is_platform_generated := $(if $(_is_soong_module),,$(_is_build_prop)$(_is_notice_file)$(_is_product_system_other_avbkey)$(_is_event_log_tags_file)$(_is_system_other_odex_marker)$(_is_kernel_modules_blocklist)$(_is_fsverity_build_manifest_apk)$(_is_linker_config)$(_is_partition_compat_symlink)$(_is_flags_file)$(_is_rootdir_symlink))) \
 	  $(eval _static_libs := $(if $(_is_soong_module),,$(ALL_INSTALLED_FILES.$f.STATIC_LIBRARIES))) \
 	  $(eval _whole_static_libs := $(if $(_is_soong_module),,$(ALL_INSTALLED_FILES.$f.WHOLE_STATIC_LIBRARIES))) \
@@ -1876,13 +1920,13 @@ $(SOONG_OUT_DIR)/compliance-metadata/$(TARGET_PRODUCT)/make-modules.csv:
 	echo 'name,module_path,module_class,module_type,static_libs,whole_static_libs,built_files,installed_files' >> $@
 	$(foreach m,$(ALL_MODULES), \
 	  $(eval _module_name := $m) \
-	  $(eval _module_path := $(strip $(sort $(ALL_MODULES.$(_module_name).PATH)))) \
+	  $(eval _module_path := $(sort $(ALL_MODULES.$(_module_name).PATH))) \
 	  $(eval _make_module_class := $(ALL_MODULES.$(_module_name).CLASS)) \
 	  $(eval _make_module_type := $(ALL_MODULES.$(_module_name).MAKE_MODULE_TYPE)) \
-	  $(eval _static_libs := $(strip $(sort $(ALL_MODULES.$(_module_name).STATIC_LIBS)))) \
-	  $(eval _whole_static_libs := $(strip $(sort $(ALL_MODULES.$(_module_name).WHOLE_STATIC_LIBS)))) \
-	  $(eval _built_files := $(strip $(sort $(ALL_MODULES.$(_module_name).BUILT)))) \
-	  $(eval _installed_files := $(strip $(sort $(ALL_MODULES.$(_module_name).INSTALLED)))) \
+	  $(eval _static_libs := $(sort $(ALL_MODULES.$(_module_name).STATIC_LIBS))) \
+	  $(eval _whole_static_libs := $(sort $(ALL_MODULES.$(_module_name).WHOLE_STATIC_LIBS))) \
+	  $(eval _built_files := $(sort $(ALL_MODULES.$(_module_name).BUILT))) \
+	  $(eval _installed_files := $(sort $(ALL_MODULES.$(_module_name).INSTALLED))) \
 	  $(eval _is_soong_module := $(ALL_MODULES.$(_module_name).IS_SOONG_MODULE)) \
 	  $(if $(_is_soong_module),, \
 		echo '$(_module_name),$(_module_path),$(_make_module_class),$(_make_module_type),$(_static_libs),$(_whole_static_libs),$(_built_files),$(_installed_files)' >> $@; \
@@ -1946,4 +1990,4 @@ endif
 
 $(call dist-write-file,$(KATI_PACKAGE_MK_DIR)/dist.mk)
 
-$(info [$(call inc_and_print,subdir_makefiles_inc)/$(subdir_makefiles_total)] writing legacy Make module rules ...)
+$(info [$(include_makefiles_total)/$(include_makefiles_total)] writing make module actions ...)

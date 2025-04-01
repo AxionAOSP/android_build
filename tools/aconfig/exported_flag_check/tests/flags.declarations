@@ -4,7 +4,7 @@ container: "system"
 flag {
     name: "foo"
     namespace: "test"
-    description: "FIXME"
+    description: "This is allow_list flag for API in the signature file"
     bug: ""
     is_exported:true
 }
@@ -12,7 +12,30 @@ flag {
 flag {
     name: "not_enabled"
     namespace: "test"
-    description: "FIXME"
+    description: "This is a flag exported, but not for API"
     bug: ""
     is_exported:true
+}
+
+flag {
+    name: "bar"
+    namespace: "test"
+    description: "This is a finalized flag for API"
+    bug: ""
+    is_exported:true
+}
+
+flag {
+    name: "boo"
+    namespace: "test"
+    description: "This is a flag not for API, but allowed"
+    bug: ""
+    is_exported:true
+}
+
+flag {
+    name: "far"
+    namespace: "test"
+    description: "This is a flag is not exported"
+    bug: ""
 }

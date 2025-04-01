@@ -63,6 +63,7 @@ PRODUCT_PACKAGES += \
     preinstalled-packages-platform-handheld-system.xml \
     PrintRecommendationService \
     PrintSpooler \
+    PrivateSpace \
     ProxyHandler \
     screenrecord \
     SecureElement \

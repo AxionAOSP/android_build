@@ -389,3 +389,27 @@ endif
 ifneq ($(filter StorageManager, $(PRODUCT_PACKAGES)),)
   $(call soong_config_set_bool,ci_tests,uses_storage_manager_tests,true)
 endif
+
+ifneq ($(BUILD_OS),darwin)
+  ifneq ($(TARGET_SKIP_OTATOOLS_PACKAGE),true)
+    $(call soong_config_set_bool,otatools,use_otatools_package,true)
+  endif
+endif
+
+# Variables for qcom bluetooth modules.
+$(call soong_config_set,qcom_bluetooth,TARGET_BLUETOOTH_UART_DEVICE,$(TARGET_BLUETOOTH_UART_DEVICE))
+$(call soong_config_set_bool,qcom_bluetooth,BOARD_HAVE_QCOM_FM,$(if $(filter true,$(BOARD_HAVE_QCOM_FM)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,BOARD_HAVE_QTI_BT_LAZY_SERVICE,$(if $(filter true,$(BOARD_HAVE_QTI_BT_LAZY_SERVICE)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,QCOM_BLUETOOTH_USING_DIAG,$(if $(filter true,$(QCOM_BLUETOOTH_USING_DIAG)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_BLUETOOTH_HCI_V1_1,$(if $(filter true,$(TARGET_BLUETOOTH_HCI_V1_1)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_BLUETOOTH_SUPPORT_QMI_ADDRESS,$(if $(filter true,$(TARGET_BLUETOOTH_SUPPORT_QMI_ADDRESS)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_DROP_BYTES_BEFORE_SSR_DUMP,$(if $(filter true,$(TARGET_DROP_BYTES_BEFORE_SSR_DUMP)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_CHANNEL_AVOIDANCE,$(if $(filter true,$(TARGET_USE_QTI_BT_CHANNEL_AVOIDANCE)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_CONFIGSTORE,$(if $(filter true,$(TARGET_USE_QTI_BT_CONFIGSTORE)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_IBS,$(if $(filter true,$(TARGET_USE_QTI_BT_IBS)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_OBS,$(if $(filter true,$(TARGET_USE_QTI_BT_OBS)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_SAR,$(if $(filter true,$(TARGET_USE_QTI_BT_SAR)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_SAR_V1_1,$(if $(filter true,$(TARGET_USE_QTI_BT_SAR_V1_1)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_VND_FWK_DETECT,$(if $(filter true,$(TARGET_USE_QTI_VND_FWK_DETECT)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,UART_BAUDRATE_3_0_MBPS,$(if $(filter true,$(UART_BAUDRATE_3_0_MBPS)),true,false))
+$(call soong_config_set_bool,qcom_bluetooth,UART_USE_TERMIOS_AFC,$(if $(filter true,$(UART_USE_TERMIOS_AFC)),true,false))
