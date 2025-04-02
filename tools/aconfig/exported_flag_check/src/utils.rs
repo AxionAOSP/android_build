@@ -183,5 +183,23 @@ mod tests {
                 "record_finalized_flags.test.bar".to_string(),
             ])
         );
+
+        let allow_flag_file = r#"
+        record_finalized_flags.test.foo
+        record_finalized_flags.test.boo
+        record_finalized_flags.test.not_enabled
+        "#
+        .as_bytes();
+        let flags = filter_api_flags(&bytes[..], allow_flag_file).unwrap();
+        let parsed_flags = aconfig_protos::parsed_flags::try_from_binary_proto(&flags).unwrap();
+        assert_eq!(1, parsed_flags.parsed_flag.len());
+
+        let ret = parsed_flags
+            .parsed_flag
+            .into_iter()
+            .filter(|flag| flag.is_exported())
+            .map(|flag| flag.fully_qualified_name())
+            .collect::<HashSet<FlagId>>();
+        assert_eq!(ret, HashSet::from_iter(vec!["record_finalized_flags.test.bar".to_string(),]));
     }
 }

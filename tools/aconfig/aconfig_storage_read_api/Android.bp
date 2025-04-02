@@ -19,6 +19,7 @@ rust_library {
     name: "libaconfig_storage_read_api",
     crate_name: "aconfig_storage_read_api",
     host_supported: true,
+    vendor_available: true,
     defaults: ["aconfig_storage_read_api.defaults"],
     rustlibs: [
         "libaconfig_storage_file",
@@ -44,7 +45,6 @@ rust_library {
     ],
     min_sdk_version: "29",
 }
-
 
 rust_test_host {
     name: "aconfig_storage_read_api.test",

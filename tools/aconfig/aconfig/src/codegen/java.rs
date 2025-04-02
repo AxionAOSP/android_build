@@ -82,6 +82,15 @@ where
             "ExportedFlags.java",
             include_str!("../../templates/ExportedFlags.java.template"),
         )?;
+    } else {
+        template.add_template(
+            "CustomFeatureFlags.java",
+            include_str!("../../templates/CustomFeatureFlags.java.template"),
+        )?;
+        template.add_template(
+            "FakeFeatureFlagsImpl.java",
+            include_str!("../../templates/FakeFeatureFlagsImpl.java.template"),
+        )?;
     }
     template.add_template("Flags.java", include_str!("../../templates/Flags.java.template"))?;
     add_feature_flags_impl_template(&context, &mut template)?;
@@ -89,25 +98,14 @@ where
         "FeatureFlags.java",
         include_str!("../../templates/FeatureFlags.java.template"),
     )?;
-    template.add_template(
-        "CustomFeatureFlags.java",
-        include_str!("../../templates/CustomFeatureFlags.java.template"),
-    )?;
-    template.add_template(
-        "FakeFeatureFlagsImpl.java",
-        include_str!("../../templates/FakeFeatureFlagsImpl.java.template"),
-    )?;
 
     let path: PathBuf = package.split('.').collect();
-    let mut files = vec![
-        "Flags.java",
-        "FeatureFlags.java",
-        "FeatureFlagsImpl.java",
-        "CustomFeatureFlags.java",
-        "FakeFeatureFlagsImpl.java",
-    ];
+    let mut files = vec!["Flags.java", "FeatureFlags.java", "FeatureFlagsImpl.java"];
     if library_exported && config.single_exported_file {
         files.push("ExportedFlags.java");
+    } else {
+        files.push("CustomFeatureFlags.java");
+        files.push("FakeFeatureFlagsImpl.java");
     }
     files
         .iter()
@@ -1986,6 +1984,7 @@ mod tests {
         }"#;
 
         let file = generated_files.iter().find(|f| f.path.ends_with("ExportedFlags.java")).unwrap();
+        assert_eq!(4, generated_files.len());
         assert_eq!(
             None,
             crate::test::first_significant_code_diff(

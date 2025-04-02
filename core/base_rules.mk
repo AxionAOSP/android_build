@@ -236,14 +236,12 @@ endif
 # We only support adding a default suite to native tests, native benchmarks, and instrumentation tests.
 # This is because they are the only tests we currently auto-generate test configs for.
 ifndef LOCAL_COMPATIBILITY_SUITE
-  ifndef LOCAL_NO_AUTO_NULL_SUITE
-    ifneq ($(filter NATIVE_TESTS NATIVE_BENCHMARK, $(LOCAL_MODULE_CLASS)),)
+  ifneq ($(filter NATIVE_TESTS NATIVE_BENCHMARK, $(LOCAL_MODULE_CLASS)),)
+    LOCAL_COMPATIBILITY_SUITE := null-suite
+  endif
+  ifneq ($(filter APPS, $(LOCAL_MODULE_CLASS)),)
+    ifneq ($(filter $(LOCAL_MODULE_TAGS),tests),)
       LOCAL_COMPATIBILITY_SUITE := null-suite
-    endif
-    ifneq ($(filter APPS, $(LOCAL_MODULE_CLASS)),)
-      ifneq ($(filter $(LOCAL_MODULE_TAGS),tests),)
-        LOCAL_COMPATIBILITY_SUITE := null-suite
-      endif
     endif
   endif
 endif

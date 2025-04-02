@@ -738,45 +738,6 @@ def GeneratePartitionTimestampFlagsDowngrade(
   ]
 
 
-def SupportsMainlineGkiUpdates(target_file):
-  """Return True if the build supports MainlineGKIUpdates.
-
-  This function scans the product.img file in IMAGES/ directory for
-  pattern |*/apex/com.android.gki.*.apex|. If there are files
-  matching this pattern, conclude that build supports mainline
-  GKI and return True
-
-  Args:
-    target_file: Path to a target_file.zip, or an extracted directory
-  Return:
-    True if thisb uild supports Mainline GKI Updates.
-  """
-  if target_file is None:
-    return False
-  if os.path.isfile(target_file):
-    target_file = common.UnzipTemp(target_file, ["IMAGES/product.img"])
-  if not os.path.isdir(target_file):
-    assert os.path.isdir(target_file), \
-        "{} must be a path to zip archive or dir containing extracted"\
-        " target_files".format(target_file)
-  image_file = os.path.join(target_file, "IMAGES", "product.img")
-
-  if not os.path.isfile(image_file):
-    return False
-
-  if IsSparseImage(image_file):
-    # Unsparse the image
-    tmp_img = common.MakeTempFile(suffix=".img")
-    subprocess.check_output(["simg2img", image_file, tmp_img])
-    image_file = tmp_img
-
-  cmd = ["debugfs_static", "-R", "ls -p /apex", image_file]
-  output = subprocess.check_output(cmd).decode()
-
-  pattern = re.compile(r"com\.android\.gki\..*\.apex")
-  return pattern.search(output) is not None
-
-
 def ExtractOrCopyTargetFiles(target_file):
   if os.path.isdir(target_file):
     return CopyTargetFilesDir(target_file)
