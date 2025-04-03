@@ -581,6 +581,7 @@ def get_license_of_product_copy_file(file_path):
       'frameworks/base/data/keyboards/',
       'frameworks/base/data/sounds/',
       'frameworks/native/data/etc/',
+      'hardware/google/camera/devices/EmulatedCamera/hwl/configs/',
       'system/core/rootdir/etc/',
   }
   for p in paths:
