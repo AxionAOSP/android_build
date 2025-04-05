@@ -673,6 +673,8 @@ endef
 # flatten the shared library dependencies.
 define update-host-shared-libs-deps-for-suites
 $(foreach suite,general-tests device-tests vts tvts art-host-tests host-unit-tests camera-hal-tests,\
+  $(eval COMPATIBILITY.$(suite).SYMLINKS :=)\
+  $(eval COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES :=)\
   $(foreach m,$(COMPATIBILITY.$(suite).MODULES),\
     $(eval my_deps := $(call get-all-shared-libs-deps,$(m)))\
     $(foreach dep,$(my_deps),\
@@ -685,15 +687,13 @@ $(foreach suite,general-tests device-tests vts tvts art-host-tests host-unit-tes
         $(if $(strip $(patsubst %x86,,$(COMPATIBILITY.$(suite).ARCH_DIRS.$(m)))), \
           $(if $(strip $(patsubst %x86_64,,$(COMPATIBILITY.$(suite).ARCH_DIRS.$(m)))),$(eval prefix := ../..),),) \
         $(eval link_target := $(prefix)/$(lastword $(subst /, ,$(dir $(f))))/$(notdir $(f)))\
-        $(eval symlink := $(COMPATIBILITY.$(suite).ARCH_DIRS.$(m))/shared_libs/$(notdir $(f)))\
-        $(eval COMPATIBILITY.$(suite).SYMLINKS := \
-          $$(COMPATIBILITY.$(suite).SYMLINKS) $(f):$(link_target):$(symlink))\
+        $(foreach arch_dir,$(COMPATIBILITY.$(suite).ARCH_DIRS.$(m)),\
+          $(eval symlink := $(arch_dir)/shared_libs/$(notdir $(f)))\
+          $(eval COMPATIBILITY.$(suite).SYMLINKS += $(f):$(link_target):$(symlink)))\
         $(if $(strip $(ALL_TARGETS.$(target).META_LIC)),,$(call declare-copy-target-license-metadata,$(target),$(f)))\
-        $(eval COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES := \
-          $$(COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES) $(f):$(target))\
-        $(eval COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES := \
-          $(sort $(COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES))))))\
-  $(eval COMPATIBILITY.$(suite).SYMLINKS := $(sort $(COMPATIBILITY.$(suite).SYMLINKS))))
+        $(eval COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES += $(f):$(target)))))\
+  $(eval COMPATIBILITY.$(suite).SYMLINKS := $(sort $(COMPATIBILITY.$(suite).SYMLINKS)))\
+  $(eval COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES := $(sort $(COMPATIBILITY.$(suite).HOST_SHARED_LIBRARY.FILES))))
 endef
 
 $(call resolve-shared-libs-depes,TARGET_)
