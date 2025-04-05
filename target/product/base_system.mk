@@ -284,7 +284,6 @@ PRODUCT_PACKAGES += \
     system-build.prop \
     task_profiles.json \
     tc \
-    telecom \
     telephony-common \
     tombstoned \
     traced \
@@ -303,6 +302,17 @@ PRODUCT_PACKAGES += \
     wificond \
     wifi.rc \
     wm \
+
+# Once Telecom is APEX, we will consolidate all deps
+ifeq ($(RELEASE_TELECOM_MAINLINE_MODULE),true)
+  PRODUCT_PACKAGES += \
+      com.android.telecom \
+
+else
+  PRODUCT_PACKAGES += \
+      telecom \
+
+endif
 
 # When we release crashrecovery module
 ifeq ($(RELEASE_CRASHRECOVERY_MODULE),true)
