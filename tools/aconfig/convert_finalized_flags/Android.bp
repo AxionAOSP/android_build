@@ -52,11 +52,16 @@ genrule {
     srcs: [
         "//prebuilts/sdk:finalized-api-flags",
     ],
-    tool_files: ["extended_flags_list_35.txt"],
+    tool_files: [
+        "sdk/35/extended_flags_list.txt",
+        "sdk/36/extended_flags_list.txt",
+    ],
     out: ["finalized_flags_record.json"],
     tools: ["convert_finalized_flags"],
     cmd: "args=\"\" && " +
         "for f in $(locations //prebuilts/sdk:finalized-api-flags); " +
         " do args=\"$$args --flag_file_path $$f\"; done && " +
-        "$(location convert_finalized_flags) $$args  --extended-flag-file-path $(location extended_flags_list_35.txt) > $(out)",
+        "$(location convert_finalized_flags) $$args " +
+        "  --flag_file_path $(location sdk/35/extended_flags_list.txt) " +
+        "  --flag_file_path $(location sdk/36/extended_flags_list.txt) > $(out)",
 }
