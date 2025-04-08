@@ -165,7 +165,7 @@ android_system_image {
         // init-second-stage to load debug policy from system_ext.
         // This option is only meant to be set by compliance GSI targets.
         "system_ext_userdebug_plat_sepolicy.cil",
-    ] + select(product_variable("debuggable"), {
+    ] + select(soong_config_variable("gsi", "import_usb_debugging_test_app"), {
         true: ["UsbDisableDebugger"],
         default: [],
     }),

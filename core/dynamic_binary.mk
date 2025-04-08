@@ -63,26 +63,6 @@ ALL_MODULES.$(my_register_name).ELF_SYMBOL_MAPPING_PATH := $(elf_mapping_path)
 $(eval $(call copy-unstripped-elf-file-with-mapping,$(symbolic_input),$(symbolic_output),$(elf_mapping_path)))
 
 ###########################################################
-## Store breakpad symbols
-###########################################################
-
-ifeq ($(BREAKPAD_GENERATE_SYMBOLS),true)
-my_breakpad_path := $(TARGET_OUT_BREAKPAD)/$(patsubst $(PRODUCT_OUT)/%,%,$(my_module_path))
-breakpad_input := $(inject_module)
-breakpad_output := $(my_breakpad_path)/$(my_installed_module_stem).sym
-$(breakpad_output) : $(breakpad_input) | $(BREAKPAD_DUMP_SYMS) $(PRIVATE_READELF)
-	@echo "target breakpad: $(PRIVATE_MODULE) ($@)"
-	@mkdir -p $(dir $@)
-	$(hide) if $(PRIVATE_READELF) -S $< > /dev/null 2>&1 ; then \
-	  $(BREAKPAD_DUMP_SYMS) -c $< > $@ ; \
-	else \
-	  echo "skipped for non-elf file."; \
-	  touch $@; \
-	fi
-$(LOCAL_BUILT_MODULE) : $(breakpad_output)
-endif
-
-###########################################################
 ## Strip
 ###########################################################
 strip_input := $(inject_module)
@@ -152,6 +132,5 @@ endif # my_strip_module
 $(cleantarget): PRIVATE_CLEAN_FILES += \
     $(linked_module) \
     $(inject_module) \
-    $(breakpad_output) \
     $(symbolic_output) \
     $(strip_output)

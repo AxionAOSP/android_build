@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use convert_finalized_flags::FinalizedFlagMap;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use protobuf::Message;
 use std::collections::HashMap;
 use std::hash::Hasher;
@@ -30,8 +31,8 @@ use crate::codegen::CodegenMode;
 use crate::dump::{DumpFormat, DumpPredicate};
 use crate::storage::generate_storage_file;
 use aconfig_protos::{
-    ParsedFlagExt, ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag,
-    ProtoParsedFlags, ProtoTracepoint,
+    ParsedFlagExt, ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend,
+    ProtoParsedFlag, ProtoParsedFlags, ProtoTracepoint,
 };
 use aconfig_storage_file::sip_hasher13::SipHasher13;
 use aconfig_storage_file::StorageFileType;
@@ -63,6 +64,31 @@ pub struct OutputFile {
 
 pub const DEFAULT_FLAG_STATE: ProtoFlagState = ProtoFlagState::DISABLED;
 pub const DEFAULT_FLAG_PERMISSION: ProtoFlagPermission = ProtoFlagPermission::READ_WRITE;
+
+// A hash map from beta namespace name to the corresponding containers. This is used to
+// determine if an RW flag is a mainline beta flag which is defined as:
+// 1, defined inside a beta namespace
+// 2, has the corresponding mainline module as container
+// TODO(b/328657418): Populate the map with mainline beta namespaces
+lazy_static! {
+    static ref MAINLINE_BETA_NAMESPACES: HashMap<&'static str, &'static str> =
+        vec![].into_iter().collect();
+}
+
+fn assign_storage_backend(pf: &mut ProtoParsedFlag) -> Result<()> {
+    let is_mainline_beta = MAINLINE_BETA_NAMESPACES.get(pf.namespace()) == Some(&pf.container());
+    let is_read_only = pf.permission() == ProtoFlagPermission::READ_ONLY;
+    let storage = if is_read_only {
+        ProtoFlagStorageBackend::NONE
+    } else if is_mainline_beta {
+        ProtoFlagStorageBackend::DEVICE_CONFIG
+    } else {
+        ProtoFlagStorageBackend::ACONFIGD
+    };
+    let m = pf.metadata.as_mut().ok_or(anyhow!("missing metadata"))?;
+    m.set_storage(storage);
+    Ok(())
+}
 
 pub fn parse_flags(
     package: &str,
@@ -132,6 +158,7 @@ pub fn parse_flags(
             let purpose = flag_declaration.metadata.purpose();
             metadata.set_purpose(purpose);
             parsed_flag.metadata = Some(metadata).into();
+            assign_storage_backend(&mut parsed_flag)?;
 
             // verify ParsedFlag looks reasonable
             aconfig_protos::parsed_flag::verify_fields(&parsed_flag)?;
@@ -178,7 +205,10 @@ pub fn parse_flags(
             );
 
             parsed_flag.set_state(flag_value.state());
-            parsed_flag.set_permission(flag_value.permission());
+            if parsed_flag.permission() != flag_value.permission() {
+                parsed_flag.set_permission(flag_value.permission());
+                assign_storage_backend(parsed_flag)?;
+            }
             let mut tracepoint = ProtoTracepoint::new();
             tracepoint.set_source(input.source.clone());
             tracepoint.set_state(flag_value.state());
@@ -834,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_flags_metadata() {
+    fn test_parse_flags_metadata_purpose() {
         let metadata_flag = r#"
         package: "com.first"
         flag {
@@ -867,6 +897,109 @@ mod tests {
         assert_eq!(1, parsed_flags.parsed_flag.len());
         let parsed_flag = parsed_flags.parsed_flag.first().unwrap();
         assert_eq!(ProtoFlagPurpose::PURPOSE_FEATURE, parsed_flag.metadata.purpose());
+    }
+
+    #[test]
+    fn test_parse_flags_metadata_storage() {
+        let metadata_flag = r#"
+        package: "com.first"
+        flag {
+            name: "first"
+            namespace: "first_ns"
+            description: "This is the description of this feature flag."
+            bug: "123"
+        }
+        "#;
+
+        // Case 1, regular RW flag without value file override
+        let declaration = vec![Input {
+            source: "memory".to_string(),
+            reader: Box::new(metadata_flag.as_bytes()),
+        }];
+        let value: Vec<Input> = vec![];
+
+        let flags_bytes = crate::commands::parse_flags(
+            "com.first",
+            None,
+            declaration,
+            value,
+            ProtoFlagPermission::READ_WRITE,
+            true,
+        )
+        .unwrap();
+        let parsed_flags =
+            aconfig_protos::parsed_flags::try_from_binary_proto(&flags_bytes).unwrap();
+        assert_eq!(1, parsed_flags.parsed_flag.len());
+        let parsed_flag = parsed_flags.parsed_flag.first().unwrap();
+        assert_eq!(ProtoFlagStorageBackend::ACONFIGD, parsed_flag.metadata.storage());
+
+        // Case 2, regular RW flag with value file override to RO
+        let declaration = vec![Input {
+            source: "memory".to_string(),
+            reader: Box::new(metadata_flag.as_bytes()),
+        }];
+        let first_flag_value = r#"
+        flag_value {
+            package: "com.first"
+            name: "first"
+            state: DISABLED
+            permission: READ_ONLY
+        }
+        "#;
+        let value = vec![Input {
+            source: "memory".to_string(),
+            reader: Box::new(first_flag_value.as_bytes()),
+        }];
+        let flags_bytes = crate::commands::parse_flags(
+            "com.first",
+            None,
+            declaration,
+            value,
+            ProtoFlagPermission::READ_WRITE,
+            true,
+        )
+        .unwrap();
+        let parsed_flags =
+            aconfig_protos::parsed_flags::try_from_binary_proto(&flags_bytes).unwrap();
+        assert_eq!(1, parsed_flags.parsed_flag.len());
+        let parsed_flag = parsed_flags.parsed_flag.first().unwrap();
+        assert_eq!(ProtoFlagStorageBackend::NONE, parsed_flag.metadata.storage());
+
+        // Case 3, fixed read only flag
+        let metadata_flag = r#"
+        package: "com.first"
+        flag {
+            name: "first"
+            namespace: "first_ns"
+            description: "This is the description of this feature flag."
+            bug: "123"
+            is_fixed_read_only: true
+        }
+        "#;
+        let declaration = vec![Input {
+            source: "memory".to_string(),
+            reader: Box::new(metadata_flag.as_bytes()),
+        }];
+        let value: Vec<Input> = vec![];
+
+        let flags_bytes = crate::commands::parse_flags(
+            "com.first",
+            None,
+            declaration,
+            value,
+            ProtoFlagPermission::READ_WRITE,
+            true,
+        )
+        .unwrap();
+        let parsed_flags =
+            aconfig_protos::parsed_flags::try_from_binary_proto(&flags_bytes).unwrap();
+        assert_eq!(1, parsed_flags.parsed_flag.len());
+        let parsed_flag = parsed_flags.parsed_flag.first().unwrap();
+        assert_eq!(ProtoFlagStorageBackend::NONE, parsed_flag.metadata.storage());
+
+        // TODO case 4, mainline beta namespace fixed read only flag
+        // TODO case 5, mainline beta namespace platform flag
+        // TODO case 6, mainline beta namespace mainline flag
     }
 
     #[test]

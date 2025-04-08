@@ -49,6 +49,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: NONE
   }
 }
 parsed_flag {
@@ -69,6 +70,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: ACONFIGD
   }
 }
 parsed_flag {
@@ -94,6 +96,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: ACONFIGD
   }
 }
 parsed_flag {
@@ -119,6 +122,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: ACONFIGD
   }
 }
 parsed_flag {
@@ -144,6 +148,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: NONE
   }
 }
 parsed_flag {
@@ -169,6 +174,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: NONE
   }
 }
 parsed_flag {
@@ -199,6 +205,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_BUGFIX
+    storage: NONE
   }
 }
 parsed_flag {
@@ -224,6 +231,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: NONE
   }
 }
 parsed_flag {
@@ -249,6 +257,7 @@ parsed_flag {
   container: "system"
   metadata {
     purpose: PURPOSE_UNSPECIFIED
+    storage: ACONFIGD
   }
 }
 "#;
