@@ -21,7 +21,7 @@ device-tests-zip := $(PRODUCT_OUT)/device-tests.zip
 device-tests-list-zip := $(PRODUCT_OUT)/device-tests_list.zip
 # Create an artifact to include all test config files in device-tests.
 device-tests-configs-zip := $(PRODUCT_OUT)/device-tests_configs.zip
-my_host_shared_lib_for_device_tests := $(call copy-many-files,$(COMPATIBILITY.device-tests.HOST_SHARED_LIBRARY.FILES))
+my_host_shared_lib_for_device_tests := $(foreach p,$(COMPATIBILITY.device-tests.HOST_SHARED_LIBRARY.FILES),$(call word-colon,2,$(p)))
 device_tests_files_list := $(PRODUCT_OUT)/device-tests_files
 
 $(device-tests-zip) : .KATI_IMPLICIT_OUTPUTS := $(device-tests-list-zip) $(device-tests-configs-zip)

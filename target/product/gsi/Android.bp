@@ -131,6 +131,7 @@ android_filesystem_defaults {
         "Camera2",
         "Dialer",
         "LatinIME",
+        "messaging",
         "apns-full-conf.xml",
         "frameworks-base-overlays",
     ],
@@ -200,7 +201,6 @@ android_system_image {
 
         // more AOSP packages
         "initial-package-stopped-states-aosp.xml",
-        "messaging",
         "PhotoTable",
         "preinstalled-packages-platform-aosp-product.xml",
         "ThemePicker",

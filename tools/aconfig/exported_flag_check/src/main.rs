@@ -165,17 +165,12 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aconfig_protos::parsed_flags;
-    use protobuf::Message;
 
     #[test]
     fn test() {
-        let input = std::str::from_utf8(include_bytes!("../tests/flags.textproto")).unwrap();
-        let parsed_flags = parsed_flags::try_from_text_proto(input).unwrap();
-        let mut all_flags_to_be_finalized = Vec::new();
-        parsed_flags.write_to_vec(&mut all_flags_to_be_finalized).unwrap();
         let flags_used_with_flaggedapi_annotation =
             vec![&include_bytes!("../tests/api-signature-file.txt")[..]];
+        let all_flags_to_be_finalized = include_bytes!("../tests/flags.protobuf");
         let already_finalized_flags = include_bytes!("../tests/finalized-flags.txt");
         let allow_flag_file = "record_finalized_flags.test.boo".as_bytes();
         let allow_flag_package = "".as_bytes();

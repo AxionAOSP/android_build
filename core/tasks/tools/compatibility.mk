@@ -83,7 +83,7 @@ test_copied_tools := $(foreach t,$(test_tools) $(test_suite_prebuilt_tools), $(o
 
 
 # Include host shared libraries
-host_shared_libs := $(call copy-many-files, $(COMPATIBILITY.$(test_suite_name).HOST_SHARED_LIBRARY.FILES))
+host_shared_libs := $(foreach p,$(COMPATIBILITY.$(test_suite_name).HOST_SHARED_LIBRARY.FILES),$(call word-colon,2,$(p)))
 
 $(if $(strip $(host_shared_libs)),\
   $(foreach p,$(COMPATIBILITY.$(test_suite_name).HOST_SHARED_LIBRARY.FILES),\

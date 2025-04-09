@@ -413,3 +413,35 @@ $(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_BT_SAR_V1_1,$(if $(fi
 $(call soong_config_set_bool,qcom_bluetooth,TARGET_USE_QTI_VND_FWK_DETECT,$(if $(filter true,$(TARGET_USE_QTI_VND_FWK_DETECT)),true,false))
 $(call soong_config_set_bool,qcom_bluetooth,UART_BAUDRATE_3_0_MBPS,$(if $(filter true,$(UART_BAUDRATE_3_0_MBPS)),true,false))
 $(call soong_config_set_bool,qcom_bluetooth,UART_USE_TERMIOS_AFC,$(if $(filter true,$(UART_USE_TERMIOS_AFC)),true,false))
+
+# Flags for Fingerprint HAL
+$(call soong_config_set,fp_hal_feature,FPC_MODULE_TYPE,$(FPC_MODULE_TYPE))
+$(call soong_config_set,fp_hal_feature,FPC_PLATFORM_TARGET,$(FPC_PLATFORM_TARGET))
+$(call soong_config_set,fp_hal_feature,FPC_TEE_RUNTIME,$(FPC_TEE_RUNTIME))
+ifneq ($(FPC_CONFIG_RETRY_MATCH_TIMEOUT),)
+  $(call soong_config_set,fp_hal_feature,FPC_CONFIG_RETRY_MATCH_TIMEOUT,$(FPC_CONFIG_RETRY_MATCH_TIMEOUT))
+endif
+ifneq ($(GOOGLE_CONFIG_DP_COUNT),)
+  $(call soong_config_set,fp_hal_feature,GOOGLE_CONFIG_DP_COUNT,$(GOOGLE_CONFIG_DP_COUNT))
+endif
+ifneq ($(GOOGLE_CONFIG_POWER_NODE),)
+  $(call soong_config_set,fp_hal_feature,GOOGLE_CONFIG_POWER_NODE,$(GOOGLE_CONFIG_POWER_NODE))
+endif
+
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_DEBUG,$(if $(filter 1,$(FPC_CONFIG_DEBUG)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENGINEERING,$(if $(FPC_CONFIG_ENGINEERING),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENROL_TIMEOUT,$(if $(filter 1,$(FPC_CONFIG_ENROL_TIMEOUT)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_FIDO_AUTH,$(if $(FPC_CONFIG_FIDO_AUTH),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_GOOGLE_CUSTOMIZE,$(if $(filter 1,$(FPC_CONFIG_GOOGLE_CUSTOMIZE)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NAVIGATION,$(if $(FPC_CONFIG_NAVIGATION),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NO_ALGO,$(if $(FPC_CONFIG_NO_ALGO),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NO_SENSOR,$(if $(FPC_CONFIG_NO_SENSOR),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NORMAL_SENSOR_RESET,$(if $(FPC_CONFIG_NORMAL_SENSOR_RESET),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NORMAL_SPI_RESET,$(if $(FPC_CONFIG_NORMAL_SPI_RESET),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_SENSORTEST,$(if $(FPC_CONFIG_SENSORTEST),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_SWIPE_ENROL,$(if $(filter 1,$(FPC_CONFIG_SWIPE_ENROL)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TA_FS,$(if $(FPC_CONFIG_TA_FS),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TRUSTY_CLEAN_TA,$(if $(filter 1,$(FPC_CONFIG_TRUSTY_CLEAN_TA)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TRUSTY_SC,$(if $(filter 1,$(FPC_CONFIG_TRUSTY_SC)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,GOOGLE_CONFIG_PERFORMANCE,$(if $(filter 1,$(GOOGLE_CONFIG_PERFORMANCE)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,GOOGLE_CONFIG_TOUCH_TO_UNLOCK_ANYTIME,$(if $(filter 1,$(GOOGLE_CONFIG_TOUCH_TO_UNLOCK_ANYTIME)),true,false))

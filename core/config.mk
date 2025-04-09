@@ -45,8 +45,6 @@ CHANGES_URL := https://android.googlesource.com/platform/build/+/master/Changes.
 $(KATI_deprecated_var TARGET_USES_64_BIT_BINDER,All devices use 64-bit binder by default now. Uses of TARGET_USES_64_BIT_BINDER should be removed.)
 $(KATI_deprecated_var PRODUCT_SEPOLICY_SPLIT,All devices are built with split sepolicy.)
 $(KATI_deprecated_var PRODUCT_SEPOLICY_SPLIT_OVERRIDE,All devices are built with split sepolicy.)
-$(KATI_deprecated_var BOARD_SYSTEM_EXT_PREBUILT_DIR,Use BOARD_SYSTEM_EXT_SEPOLICY_PREBUILT_DIRS instead)
-$(KATI_deprecated_var BOARD_PRODUCT_PREBUILT_DIR,Use BOARD_PRODUCT_SEPOLICY_PREBUILT_DIRS instead)
 $(KATI_obsolete_var PATH,Do not use PATH directly. See $(CHANGES_URL)#PATH)
 $(KATI_obsolete_var PYTHONPATH,Do not use PYTHONPATH directly. See $(CHANGES_URL)#PYTHONPATH)
 $(KATI_obsolete_var OUT,Use OUT_DIR instead. See $(CHANGES_URL)#OUT)
@@ -176,6 +174,8 @@ $(KATI_obsolete_var BUILDING_PVMFW_IMAGE,BUILDING_PVMFW_IMAGE is no longer used)
 $(KATI_obsolete_var BOARD_BUILD_SYSTEM_ROOT_IMAGE)
 $(KATI_obsolete_var FS_GET_STATS)
 $(KATI_obsolete_var BUILD_BROKEN_USES_SOONG_PYTHON2_MODULES)
+$(KATI_obsolete_var BOARD_SYSTEM_EXT_PREBUILT_DIR,Use BOARD_SYSTEM_EXT_SEPOLICY_PREBUILT_DIRS instead)
+$(KATI_obsolete_var BOARD_PRODUCT_PREBUILT_DIR,Use BOARD_PRODUCT_SEPOLICY_PREBUILT_DIRS instead)
 
 # Used to force goals to build.  Only use for conditionally defined goals.
 .PHONY: FORCE
@@ -891,14 +891,6 @@ PLATFORM_SEPOLICY_COMPAT_VERSIONS += $(foreach ver,\
 BOARD_GENFS_LABELS_VERSION ?= $(BOARD_API_LEVEL)
 ifeq ($(call math_gt,$(BOARD_API_LEVEL),$(BOARD_GENFS_LABELS_VERSION)),true)
   $(error BOARD_GENFS_LABELS_VERSION ($(BOARD_GENFS_LABELS_VERSION)) must be greater than or equal to BOARD_API_LEVEL ($(BOARD_API_LEVEL)))
-endif
-
-ifneq (,$(BOARD_SYSTEM_EXT_PREBUILT_DIR))
-BOARD_SYSTEM_EXT_SEPOLICY_PREBUILT_DIRS += $(BOARD_SYSTEM_EXT_PREBUILT_DIR)
-endif
-
-ifneq (,$(BOARD_PRODUCT_PREBUILT_DIR))
-BOARD_PRODUCT_SEPOLICY_PREBUILT_DIRS += $(BOARD_PRODUCT_PREBUILT_DIR)
 endif
 
 ifeq ($(PRODUCT_USE_DYNAMIC_PARTITIONS),true)
