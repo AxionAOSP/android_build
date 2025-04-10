@@ -117,6 +117,8 @@ class TestDiscoveryAgent:
           "com.android.tradefed.observatory.TestMappingDiscoveryAgent"
       )
       java_args.extend(self.tradefed_args)
+      # Include test mapping imports in the discovery.
+      java_args.append("--no-ignore-test-mapping-imports")
       env = os.environ.copy()
       env.update({"SKIP_JAVA_QUERY": "1"})
       env.update({"ALLOW_EMPTY_TEST_MAPPING": "1"})
