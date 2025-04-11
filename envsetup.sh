@@ -1694,7 +1694,7 @@ function generate_host_overrides() {
 function cpo {
     local device="${LINEAGE_BUILD}"
     local output_dir="out/target/product/$device"
-    local dest_dir="$HOME/ROM"
+    local base_dest_dir="$HOME/ROM"
 
     local latest_zip
     latest_zip=$(ls -t "$output_dir"/*.zip 2>/dev/null | head -n 1)
@@ -1704,9 +1704,20 @@ function cpo {
         return 1
     fi
 
-    mkdir -p "$dest_dir"
+    mkdir -p "$base_dest_dir"
+    cp "$latest_zip" "$base_dest_dir" && echo "Copied $(basename "$latest_zip") to $base_dest_dir"
 
-    cp "$latest_zip" "$dest_dir" && echo "Copied $(basename "$latest_zip") to $dest_dir"
+    if [[ "$latest_zip" == *GMS* ]]; then
+        local dest_dir="$base_dest_dir/GMS"
+        mkdir -p "$dest_dir"
+        cp "$output_dir/GMS/$device.json" "$dest_dir" && echo "Copied $device.json from GMS folder"
+    elif [[ "$latest_zip" == *VANILLA* ]]; then
+        local dest_dir="$base_dest_dir/VANILLA"
+        mkdir -p "$dest_dir"
+        cp "$output_dir/VANILLA/$device.json" "$dest_dir" && echo "Copied $device.json from VANILLA folder"
+    else
+        echo "Neither GMS nor VANILLA detected in zip name."
+    fi
 }
 
 function bpx() {
