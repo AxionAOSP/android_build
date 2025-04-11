@@ -1723,9 +1723,9 @@ function cpo {
 function bpx() {
     function get_devices() {
         case "$1" in
-            "6") echo "oriole raven bluejay" ;;  # Pixel 6 Series
-            "7") echo "panther cheetah lynx" ;;  # Pixel 7 Series
-            "8") echo "shiba husky akita" ;;     # Pixel 8 Series
+            "6") echo "raven oriole bluejay" ;;  # Pixel 6 Series
+            "7") echo "cheetah panther lynx" ;;  # Pixel 7 Series
+            "8") echo "husky shiba akita" ;;     # Pixel 8 Series
             *) echo "oriole raven bluejay panther cheetah lynx shiba husky akita" ;;
         esac
     }
