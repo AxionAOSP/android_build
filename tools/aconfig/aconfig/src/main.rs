@@ -163,30 +163,6 @@ fn cli() -> Command {
                         .long("single-exported-file")
                         .value_parser(clap::value_parser!(bool))
                         .default_value("false"),
-                )
-                // TODO: b/395899938 - clean up flags for switching to new storage
-                .arg(
-                    Arg::new("allow-instrumentation")
-                        .long("allow-instrumentation")
-                        .value_parser(clap::value_parser!(bool))
-                        .default_value("false"),
-                )
-                // TODO: b/395899938 - clean up flags for switching to new storage
-                .arg(
-                    Arg::new("new-exported")
-                        .long("new-exported")
-                        .value_parser(clap::value_parser!(bool))
-                        .default_value("false"),
-                )
-                // Allows build flag toggling of checking API level in exported
-                // flag lib for finalized API flags.
-                // TODO: b/378936061 - Remove once build flag for API level
-                // check is fully enabled.
-                .arg(
-                    Arg::new("check-api-level")
-                        .long("check-api-level")
-                        .value_parser(clap::value_parser!(bool))
-                        .default_value("false"),
                 ),
         )
         .subcommand(
@@ -198,24 +174,12 @@ fn cli() -> Command {
                         .long("mode")
                         .value_parser(EnumValueParser::<CodegenMode>::new())
                         .default_value("production"),
-                )
-                .arg(
-                    Arg::new("allow-instrumentation")
-                        .long("allow-instrumentation")
-                        .value_parser(clap::value_parser!(bool))
-                        .default_value("false"),
                 ),
         )
         .subcommand(
             Command::new("create-rust-lib")
                 .arg(Arg::new("cache").long("cache").required(true))
                 .arg(Arg::new("out").long("out").required(true))
-                .arg(
-                    Arg::new("allow-instrumentation")
-                        .long("allow-instrumentation")
-                        .value_parser(clap::value_parser!(bool))
-                        .default_value("false"),
-                )
                 .arg(
                     Arg::new("mode")
                         .long("mode")
@@ -385,25 +349,13 @@ fn main() -> Result<()> {
         Some(("create-java-lib", sub_matches)) => {
             let cache = open_single_file(sub_matches, "cache")?;
             let mode = get_required_arg::<CodegenMode>(sub_matches, "mode")?;
-            let allow_instrumentation =
-                get_required_arg::<bool>(sub_matches, "allow-instrumentation")?;
-            let new_exported = get_required_arg::<bool>(sub_matches, "new-exported")?;
             let single_exported_file =
                 get_required_arg::<bool>(sub_matches, "single-exported-file")?;
+            let finalized_flags: FinalizedFlagMap = load_finalized_flags()?;
 
-            let check_api_level = get_required_arg::<bool>(sub_matches, "check-api-level")?;
-            let finalized_flags: FinalizedFlagMap =
-                if *check_api_level { load_finalized_flags()? } else { FinalizedFlagMap::new() };
-
-            let generated_files = commands::create_java_lib(
-                cache,
-                *mode,
-                *allow_instrumentation,
-                *new_exported,
-                *single_exported_file,
-                finalized_flags,
-            )
-            .context("failed to create java lib")?;
+            let generated_files =
+                commands::create_java_lib(cache, *mode, *single_exported_file, finalized_flags)
+                    .context("failed to create java lib")?;
             let dir = PathBuf::from(get_required_arg::<String>(sub_matches, "out")?);
             generated_files
                 .iter()

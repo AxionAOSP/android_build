@@ -815,6 +815,7 @@ system_image_defaults {
                 "PartnerBookmarksProvider", // generic_system
                 "PrintRecommendationService", // handheld_system
                 "PrintSpooler", // handheld_system
+                "PrivateSpace", // handheld_system
                 "ProxyHandler", // handheld_system
                 "SecureElement", // handheld_system
                 "SettingsProvider", // base_system

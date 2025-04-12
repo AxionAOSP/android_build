@@ -415,6 +415,8 @@ $(call soong_config_set_bool,qcom_bluetooth,UART_BAUDRATE_3_0_MBPS,$(if $(filter
 $(call soong_config_set_bool,qcom_bluetooth,UART_USE_TERMIOS_AFC,$(if $(filter true,$(UART_USE_TERMIOS_AFC)),true,false))
 
 # Flags for Fingerprint HAL
+$(call soong_config_set,fp_hal_feature,FPC_CONFIG_KEYMASTER_APP_PATH,$(FPC_CONFIG_KEYMASTER_APP_PATH))
+$(call soong_config_set,fp_hal_feature,FPC_CONFIG_KEYMASTER_NAME,$(FPC_CONFIG_KEYMASTER_NAME))
 $(call soong_config_set,fp_hal_feature,FPC_MODULE_TYPE,$(FPC_MODULE_TYPE))
 $(call soong_config_set,fp_hal_feature,FPC_PLATFORM_TARGET,$(FPC_PLATFORM_TARGET))
 $(call soong_config_set,fp_hal_feature,FPC_TEE_RUNTIME,$(FPC_TEE_RUNTIME))

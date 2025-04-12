@@ -7737,8 +7737,7 @@ deps := \
   $(INSTALLED_SDK_BUILD_PROP_TARGET) \
 	$(ATREE_FILES) \
 	$(sdk_atree_files) \
-	$(HOST_OUT_EXECUTABLES)/atree \
-	$(HOST_OUT_EXECUTABLES)/line_endings
+	$(HOST_OUT_EXECUTABLES)/atree
 
 # The name of the subdir within the platforms dir of the sdk. One of:
 # - android-<SDK_INT> (stable base dessert SDKs)

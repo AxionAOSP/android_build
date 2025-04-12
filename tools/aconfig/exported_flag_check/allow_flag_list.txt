@@ -285,6 +285,7 @@ com.android.net.flags.tethering_active_sessions_metrics
 com.android.net.thread.flags.thread_mobile_enabled
 com.android.nfc.module.flags.nfc_hce_latency_events
 com.android.org.conscrypt.flags.certificate_transparency_checkservertrusted_api
+com.android.org.conscrypt.net.flags.certificate_transparency_default_enabled
 com.android.permission.flags.add_banners_to_privacy_sensitive_apps_for_aaos
 com.android.permission.flags.app_permission_fragment_uses_preferences
 com.android.permission.flags.archiving_read_only

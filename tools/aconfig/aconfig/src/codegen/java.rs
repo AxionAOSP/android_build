@@ -31,9 +31,7 @@ use std::collections::HashMap;
 pub struct JavaCodegenConfig {
     pub codegen_mode: CodegenMode,
     pub flag_ids: HashMap<String, u16>,
-    pub allow_instrumentation: bool,
     pub package_fingerprint: u64,
-    pub new_exported: bool,
     pub single_exported_file: bool,
     pub finalized_flags: FinalizedFlagMap,
 }
@@ -69,11 +67,9 @@ where
         properties_set,
         package_name: package.to_string(),
         library_exported,
-        allow_instrumentation: config.allow_instrumentation,
         container,
         is_platform_container,
         package_fingerprint: format!("0x{:X}L", config.package_fingerprint),
-        new_exported: config.new_exported,
         single_exported_file: config.single_exported_file,
     };
     let mut template = TinyTemplate::new();
@@ -148,11 +144,9 @@ struct Context {
     pub properties_set: BTreeSet<String>,
     pub package_name: String,
     pub library_exported: bool,
-    pub allow_instrumentation: bool,
     pub container: String,
     pub is_platform_container: bool,
     pub package_fingerprint: String,
-    pub new_exported: bool,
     pub single_exported_file: bool,
 }
 
@@ -271,39 +265,19 @@ fn add_feature_flags_impl_template(
         return Ok(());
     }
 
-    match (context.library_exported, context.new_exported, context.allow_instrumentation) {
+    match context.library_exported {
         // Exported library with new_exported enabled, use new storage exported template.
-        (true, true, _) => {
+        true => {
             template.add_template(
                 "FeatureFlagsImpl.java",
                 include_str!("../../templates/FeatureFlagsImpl.exported.java.template"),
             )?;
         }
-
-        // Exported library with new_exported NOT enabled, use legacy (device
-        // config) template, because regardless of allow_instrumentation, we use
-        // device config for exported libs if new_exported isn't enabled.
-        // Remove once new_exported is fully rolled out.
-        (true, false, _) => {
-            template.add_template(
-                "FeatureFlagsImpl.java",
-                include_str!("../../templates/FeatureFlagsImpl.deviceConfig.java.template"),
-            )?;
-        }
-
         // New storage internal mode.
-        (false, _, true) => {
+        false => {
             template.add_template(
                 "FeatureFlagsImpl.java",
                 include_str!("../../templates/FeatureFlagsImpl.new_storage.java.template"),
-            )?;
-        }
-
-        // Device config internal mode. Use legacy (device config) template.
-        (false, _, false) => {
-            template.add_template(
-                "FeatureFlagsImpl.java",
-                include_str!("../../templates/FeatureFlagsImpl.deviceConfig.java.template"),
             )?;
         }
     };
@@ -619,9 +593,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: false,
             single_exported_file: false,
             finalized_flags: FinalizedFlagMap::new(),
         };
@@ -769,229 +741,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_java_code_exported() {
-        let parsed_flags = crate::test::parse_test_flags();
-        let mode = CodegenMode::Exported;
-        let modified_parsed_flags =
-            crate::commands::modify_parsed_flags_based_on_mode(parsed_flags, mode).unwrap();
-        let flag_ids =
-            assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
-        let config = JavaCodegenConfig {
-            codegen_mode: mode,
-            flag_ids,
-            allow_instrumentation: true,
-            package_fingerprint: 5801144784618221668,
-            new_exported: false,
-            single_exported_file: false,
-            finalized_flags: FinalizedFlagMap::new(),
-        };
-        let generated_files = generate_java_code(
-            crate::test::TEST_PACKAGE,
-            modified_parsed_flags.into_iter(),
-            config,
-        )
-        .unwrap();
-
-        let expect_flags_content = r#"
-        package com.android.aconfig.test;
-        import android.os.Build;
-        /** @hide */
-        public final class Flags {
-            /** @hide */
-            public static final String FLAG_DISABLED_RW_EXPORTED = "com.android.aconfig.test.disabled_rw_exported";
-            /** @hide */
-            public static final String FLAG_ENABLED_FIXED_RO_EXPORTED = "com.android.aconfig.test.enabled_fixed_ro_exported";
-            /** @hide */
-            public static final String FLAG_ENABLED_RO_EXPORTED = "com.android.aconfig.test.enabled_ro_exported";
-            public static boolean disabledRwExported() {
-                return FEATURE_FLAGS.disabledRwExported();
-            }
-            public static boolean enabledFixedRoExported() {
-                return FEATURE_FLAGS.enabledFixedRoExported();
-            }
-            public static boolean enabledRoExported() {
-                return FEATURE_FLAGS.enabledRoExported();
-            }
-            private static FeatureFlags FEATURE_FLAGS = new FeatureFlagsImpl();
-        }
-        "#;
-
-        let expect_feature_flags_content = r#"
-        package com.android.aconfig.test;
-        /** @hide */
-        public interface FeatureFlags {
-            boolean disabledRwExported();
-            boolean enabledFixedRoExported();
-            boolean enabledRoExported();
-        }
-        "#;
-
-        let expect_feature_flags_impl_content = r#"
-        package com.android.aconfig.test;
-        import android.os.Binder;
-        import android.provider.DeviceConfig;
-        import android.provider.DeviceConfig.Properties;
-        /** @hide */
-        public final class FeatureFlagsImpl implements FeatureFlags {
-            private static volatile boolean aconfig_test_is_cached = false;
-            private static boolean disabledRwExported = false;
-            private static boolean enabledFixedRoExported = false;
-            private static boolean enabledRoExported = false;
-
-            private void load_overrides_aconfig_test() {
-                final long ident = Binder.clearCallingIdentity();
-                try {
-                    Properties properties = DeviceConfig.getProperties("aconfig_test");
-                    disabledRwExported =
-                        properties.getBoolean(Flags.FLAG_DISABLED_RW_EXPORTED, false);
-                    enabledFixedRoExported =
-                        properties.getBoolean(Flags.FLAG_ENABLED_FIXED_RO_EXPORTED, false);
-                    enabledRoExported =
-                        properties.getBoolean(Flags.FLAG_ENABLED_RO_EXPORTED, false);
-                } catch (NullPointerException e) {
-                    throw new RuntimeException(
-                        "Cannot read value from namespace aconfig_test "
-                        + "from DeviceConfig. It could be that the code using flag "
-                        + "executed before SettingsProvider initialization. Please use "
-                        + "fixed read-only flag by adding is_fixed_read_only: true in "
-                        + "flag declaration.",
-                        e
-                    );
-                } catch (SecurityException e) {
-                    // for isolated process case, skip loading flag value from the storage, use the default
-                } finally {
-                    Binder.restoreCallingIdentity(ident);
-                }
-                aconfig_test_is_cached = true;
-            }
-            @Override
-            public boolean disabledRwExported() {
-                if (!aconfig_test_is_cached) {
-                        load_overrides_aconfig_test();
-                }
-                return disabledRwExported;
-            }
-            @Override
-            public boolean enabledFixedRoExported() {
-                if (!aconfig_test_is_cached) {
-                        load_overrides_aconfig_test();
-                }
-                return enabledFixedRoExported;
-            }
-            @Override
-            public boolean enabledRoExported() {
-                if (!aconfig_test_is_cached) {
-                        load_overrides_aconfig_test();
-                }
-                return enabledRoExported;
-            }
-        }"#;
-
-        let expect_custom_feature_flags_content = r#"
-        package com.android.aconfig.test;
-
-        import java.util.Arrays;
-        import java.util.HashMap;
-        import java.util.Map;
-        import java.util.HashSet;
-        import java.util.List;
-        import java.util.Set;
-        import java.util.function.BiPredicate;
-        import java.util.function.Predicate;
-
-        import android.os.Build;
-
-        /** @hide */
-        public class CustomFeatureFlags implements FeatureFlags {
-
-            private BiPredicate<String, Predicate<FeatureFlags>> mGetValueImpl;
-
-            public CustomFeatureFlags(BiPredicate<String, Predicate<FeatureFlags>> getValueImpl) {
-                mGetValueImpl = getValueImpl;
-            }
-
-            @Override
-            public boolean disabledRwExported() {
-                return getValue(Flags.FLAG_DISABLED_RW_EXPORTED,
-                    FeatureFlags::disabledRwExported);
-            }
-            @Override
-            public boolean enabledFixedRoExported() {
-                return getValue(Flags.FLAG_ENABLED_FIXED_RO_EXPORTED,
-                    FeatureFlags::enabledFixedRoExported);
-            }
-            @Override
-            public boolean enabledRoExported() {
-                return getValue(Flags.FLAG_ENABLED_RO_EXPORTED,
-                    FeatureFlags::enabledRoExported);
-            }
-
-            protected boolean getValue(String flagName, Predicate<FeatureFlags> getter) {
-                return mGetValueImpl.test(flagName, getter);
-            }
-
-            public List<String> getFlagNames() {
-                return Arrays.asList(
-                    Flags.FLAG_DISABLED_RW_EXPORTED,
-                    Flags.FLAG_ENABLED_FIXED_RO_EXPORTED,
-                    Flags.FLAG_ENABLED_RO_EXPORTED
-                );
-            }
-
-            private Set<String> mReadOnlyFlagsSet = new HashSet<>(
-                Arrays.asList(
-                    ""
-                )
-            );
-
-            private Map<String, Integer> mFinalizedFlags = new HashMap<>(
-                Map.ofEntries(
-                    Map.entry("", Integer.MAX_VALUE)
-                )
-            );
-
-            public boolean isFlagFinalized(String flagName) {
-                if (!mFinalizedFlags.containsKey(flagName)) {
-                    return false;
-                }
-                return Build.VERSION.SDK_INT >= mFinalizedFlags.get(flagName);
-            }
-        }
-    "#;
-
-        let mut file_set = HashMap::from([
-            ("com/android/aconfig/test/Flags.java", expect_flags_content),
-            ("com/android/aconfig/test/FeatureFlags.java", expect_feature_flags_content),
-            ("com/android/aconfig/test/FeatureFlagsImpl.java", expect_feature_flags_impl_content),
-            (
-                "com/android/aconfig/test/CustomFeatureFlags.java",
-                expect_custom_feature_flags_content,
-            ),
-            (
-                "com/android/aconfig/test/FakeFeatureFlagsImpl.java",
-                EXPECTED_FAKEFEATUREFLAGSIMPL_CONTENT,
-            ),
-        ]);
-
-        for file in generated_files {
-            let file_path = file.path.to_str().unwrap();
-            assert!(file_set.contains_key(file_path), "Cannot find {}", file_path);
-            assert_eq!(
-                None,
-                crate::test::first_significant_code_diff(
-                    file_set.get(file_path).unwrap(),
-                    &String::from_utf8(file.contents).unwrap()
-                ),
-                "File {} content is not correct",
-                file_path
-            );
-            file_set.remove(file_path);
-        }
-
-        assert!(file_set.is_empty());
-    }
-
-    #[test]
     fn test_generate_java_code_new_exported() {
         let parsed_flags = crate::test::parse_test_flags();
         let mode = CodegenMode::Exported;
@@ -1002,9 +751,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: true,
             single_exported_file: false,
             finalized_flags: FinalizedFlagMap::new(),
         };
@@ -1222,9 +969,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: true,
             single_exported_file: false,
             finalized_flags,
         };
@@ -1448,9 +1193,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: true,
             single_exported_file: false,
             finalized_flags,
         };
@@ -1488,9 +1231,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: false,
             single_exported_file: false,
             finalized_flags: FinalizedFlagMap::new(),
         };
@@ -1616,9 +1357,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: false,
             single_exported_file: false,
             finalized_flags: FinalizedFlagMap::new(),
         };
@@ -1910,9 +1649,7 @@ mod tests {
         let config = JavaCodegenConfig {
             codegen_mode: mode,
             flag_ids,
-            allow_instrumentation: true,
             package_fingerprint: 5801144784618221668,
-            new_exported: true,
             single_exported_file: true,
             finalized_flags,
         };

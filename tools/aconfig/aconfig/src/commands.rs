@@ -208,8 +208,6 @@ pub fn parse_flags(
 pub fn create_java_lib(
     mut input: Input,
     codegen_mode: CodegenMode,
-    allow_instrumentation: bool,
-    new_exported: bool,
     single_exported_file: bool,
     finalized_flags: FinalizedFlagMap,
 ) -> Result<Vec<OutputFile>> {
@@ -226,9 +224,7 @@ pub fn create_java_lib(
     let config = JavaCodegenConfig {
         codegen_mode,
         flag_ids,
-        allow_instrumentation,
         package_fingerprint,
-        new_exported,
         single_exported_file,
         finalized_flags,
     };
