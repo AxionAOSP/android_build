@@ -1750,6 +1750,32 @@ function bpx() {
     done
 }
 
+function initPixelRoomService() {
+    local ROOM_DIR="$(pwd)"
+    local MANIFESTS_DIR="$ROOM_DIR/.repo/local_manifests"
+    local ROOM_URL="https://raw.githubusercontent.com/AxionAOSP/roomservice_pixels/refs/heads/lineage-22.1/roomservice.xml"
+    local OUTPUT_FILE="$MANIFESTS_DIR/roomservice.xml"
+
+    echo "[*] Starting pixel room service..."
+
+    if [ ! -d "$MANIFESTS_DIR" ]; then
+        mkdir -p "$MANIFESTS_DIR" || { echo "[!] Failed to create directory."; exit 1; }
+    fi
+
+    if [ -f "$OUTPUT_FILE" ]; then
+        echo "[*] Backing up existing roomservice.xml"
+        cp "$OUTPUT_FILE" "$OUTPUT_FILE.bak" || { echo "[!] Backup failed."; exit 1; }
+    fi
+
+    echo "[*] Downloading roomservice.xml..."
+    if curl -fsSL "$ROOM_URL" -o "$OUTPUT_FILE"; then
+        echo "[✓] roomservice.xml successfully written to $OUTPUT_FILE"
+    else
+        echo "[!] Failed to fetch roomservice.xml"
+        exit 1
+    fi
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
