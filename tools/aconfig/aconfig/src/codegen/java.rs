@@ -24,7 +24,7 @@ use crate::codegen;
 use crate::codegen::CodegenMode;
 use crate::commands::{should_include_flag, OutputFile};
 use aconfig_protos::{ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag};
-use convert_finalized_flags::{FinalizedFlag, FinalizedFlagMap};
+use convert_finalized_flags::{ApiLevel, FinalizedFlag, FinalizedFlagMap};
 use std::collections::HashMap;
 
 // Arguments to configure codegen for generate_java_code.
@@ -169,7 +169,7 @@ struct FlagElement {
     pub method_name: String,
     pub properties: String,
     pub finalized_sdk_present: bool,
-    pub finalized_sdk_value: i32,
+    pub finalized_sdk_check: String,
 }
 
 fn create_flag_element(
@@ -199,16 +199,16 @@ fn create_flag_element(
     };
 
     // An empty map is provided if check_api_level is disabled.
-    let mut finalized_sdk_present: bool = false;
-    let mut finalized_sdk_value: i32 = 0;
-    if !finalized_flags.is_empty() {
+    let (finalized_sdk_present, finalized_sdk_value) = if !finalized_flags.is_empty() {
         let finalized_sdk = finalized_flags.get_finalized_level(&FinalizedFlag {
             flag_name: pf.name().to_string(),
             package_name: package.to_string(),
         });
-        finalized_sdk_present = finalized_sdk.is_some();
-        finalized_sdk_value = finalized_sdk.map(|f| f.0).unwrap_or_default();
-    }
+        (finalized_sdk.is_some(), finalized_sdk.unwrap_or(ApiLevel(0)))
+    } else {
+        (false, ApiLevel(0))
+    };
+    let finalized_sdk_check = finalized_sdk_value.conditional();
 
     FlagElement {
         container: pf.container().to_string(),
@@ -222,7 +222,7 @@ fn create_flag_element(
         method_name: format_java_method_name(pf.name()),
         properties: format_property_name(pf.namespace()),
         finalized_sdk_present,
-        finalized_sdk_value,
+        finalized_sdk_check,
     }
 }
 
@@ -903,9 +903,9 @@ mod tests {
                 )
             );
 
-            private Map<String, Integer> mFinalizedFlags = new HashMap<>(
+            private Map<String, Boolean> mFinalizedFlags = new HashMap<>(
                 Map.ofEntries(
-                    Map.entry("", Integer.MAX_VALUE)
+                    Map.entry("", false)
                 )
             );
 
@@ -913,7 +913,7 @@ mod tests {
                 if (!mFinalizedFlags.containsKey(flagName)) {
                     return false;
                 }
-                return Build.VERSION.SDK_INT >= mFinalizedFlags.get(flagName);
+                return mFinalizedFlags.get(flagName);
             }
         }
     "#;
@@ -960,7 +960,7 @@ mod tests {
             assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
         let mut finalized_flags = FinalizedFlagMap::new();
         finalized_flags.insert_if_new(
-            ApiLevel(36),
+            ApiLevel::from_sdk_int(36),
             FinalizedFlag {
                 flag_name: "disabled_rw_exported".to_string(),
                 package_name: "com.android.aconfig.test".to_string(),
@@ -1124,10 +1124,10 @@ mod tests {
                 )
             );
 
-            private Map<String, Integer> mFinalizedFlags = new HashMap<>(
+            private Map<String, Boolean> mFinalizedFlags = new HashMap<>(
                 Map.ofEntries(
-                    Map.entry(Flags.FLAG_DISABLED_RW_EXPORTED, 36),
-                    Map.entry("", Integer.MAX_VALUE)
+                    Map.entry(Flags.FLAG_DISABLED_RW_EXPORTED, Build.VERSION.SDK_INT >= 36 ? true : false),
+                    Map.entry("", false)
                 )
             );
 
@@ -1135,7 +1135,7 @@ mod tests {
                 if (!mFinalizedFlags.containsKey(flagName)) {
                     return false;
                 }
-                return Build.VERSION.SDK_INT >= mFinalizedFlags.get(flagName);
+                return mFinalizedFlags.get(flagName);
             }
         }
     "#;
@@ -1184,7 +1184,7 @@ mod tests {
             assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
         let mut finalized_flags = FinalizedFlagMap::new();
         finalized_flags.insert_if_new(
-            ApiLevel(36),
+            ApiLevel::from_sdk_int(36),
             FinalizedFlag {
                 flag_name: "disabled_rw".to_string(),
                 package_name: "com.android.aconfig.test".to_string(),
@@ -1640,7 +1640,7 @@ mod tests {
             assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
         let mut finalized_flags = FinalizedFlagMap::new();
         finalized_flags.insert_if_new(
-            ApiLevel(36),
+            ApiLevel::from_sdk_int(36),
             FinalizedFlag {
                 flag_name: "disabled_rw_exported".to_string(),
                 package_name: "com.android.aconfig.test".to_string(),

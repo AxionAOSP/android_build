@@ -82,14 +82,14 @@ public class CustomFeatureFlags implements FeatureFlags \{
     );
 
 {{ -if library_exported }}
-    private Map<String, Integer> mFinalizedFlags = new HashMap<>(
+    private Map<String, Boolean> mFinalizedFlags = new HashMap<>(
         Map.ofEntries(
             {{ -for item in flag_elements }}
             {{ -if item.finalized_sdk_present }}
-            Map.entry(Flags.FLAG_{item.flag_name_constant_suffix}, {item.finalized_sdk_value}),
+            Map.entry(Flags.FLAG_{item.flag_name_constant_suffix}, {item.finalized_sdk_check|unescaped} ? true : false),
             {{ -endif }}
             {{ -endfor }}
-            Map.entry("", Integer.MAX_VALUE){# The empty entry to avoid empty entries #}
+            Map.entry("", false){# The empty entry to avoid empty entries #}
         )
     );
 
@@ -97,7 +97,7 @@ public class CustomFeatureFlags implements FeatureFlags \{
         if (!mFinalizedFlags.containsKey(flagName)) \{
             return false;
         }
-        return Build.VERSION.SDK_INT >= mFinalizedFlags.get(flagName);
+        return mFinalizedFlags.get(flagName);
     }
 {{ -endif }}
 }

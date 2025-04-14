@@ -27,7 +27,7 @@ use utils::{
     get_exported_flags_from_binary_proto, read_flag_from_binary, FlagId,
 };
 
-const HELP: &str = "CCheck Exported Flags
+const HELP: &str = "Check Exported Flags
 
 This tool ensures that exported flags are used as intended. Exported flags, marked with
 `is_exported: true` in their declaration, are designed to control access to specific API
@@ -35,14 +35,39 @@ features. This tool identifies and reports any exported flags that are not curre
 associated with an API feature, preventing unnecessary flag proliferation and maintaining
 a clear API design.
 
-This tool works as follows:
+Commands:
 
-  - Read API signature files from source tree (*current.txt files) [--api-signature-file]
-  - Read the current aconfig flag values from source tree [--parsed-flags-file]
-  - Read the previous finalized-flags.txt files from prebuilts/sdk [--finalized-flags-file]
-  - Extract the flags slated for API by scanning through the API signature files
-  - Merge the found flags with the recorded flags from previous API finalizations
-  - Error if exported flags are not in the set
+This tool offers two commands:
+
+1. validate-exported-flags :This command verifies that all exported flags within 
+   the current source tree are actively used to guard API features.
+
+Arguments:
+    --parsed-flags-file: Current aconfig flag values from source tree
+    --api-signature-file: API signature files from source tree (*current.txt files)
+    --finalized-flags-file: The previous finalized-flags.txt files from prebuilts/sdk
+
+Example:
+exported-flag-tool validate-exported-flags \
+    --parsed-flags-file out/soong/aconfig/parsed_flags.pb \
+    --api-signature-file frameworks/base/api/current.txt \
+    --api-signature-file external/library/api/current.txt \
+    --finalized-flags-file prebuilts/sdk/34/public/finalized-flags.txt
+
+2. filter-api-flags: This command processes an input list of flags and filters it, based on
+   the non-api lists to produce an output file containing only the exported flags that
+   are used for controlling API features.
+
+Arguments:
+    --cache: The path to the input aconfig flag proto file
+    --out: The output file
+
+Example:
+exported-flag-tool filter-api-flags \
+    --cache build/intermediate/foo_flags.pb \
+    --cache build/intermediate/bar_flags.pb \
+    --out build/intermediate/api_relevant_exported_flags.pb
+
 ";
 
 fn cli() -> Command {
@@ -86,7 +111,7 @@ fn validate_exported_flags<R: Read>(
     parsed_flags_file: R,
     api_signature_files: Vec<R>,
     finalized_flags_file: R,
-    allow_flag_file: R,
+    non_api_flags: R,
     allow_flag_package: R,
 ) -> Result<Vec<FlagId>> {
     let mut flags_used_with_flaggedapi_annotation = HashSet::new();
@@ -96,7 +121,7 @@ fn validate_exported_flags<R: Read>(
     }
     let all_flags = get_exported_flags_from_binary_proto(parsed_flags_file)?;
     let already_finalized_flags = read_flag_from_binary(finalized_flags_file)?;
-    let allow_flag_set = read_flag_from_binary(allow_flag_file)?;
+    let allow_flag_set = read_flag_from_binary(non_api_flags)?;
     let allow_package_set = read_flag_from_binary(allow_flag_package)?;
 
     let exported_flags = check_all_exported_flags(
@@ -119,15 +144,15 @@ fn main() -> Result<()> {
             let parsed_flags_file = open_single_file(sub_matches, "parsed-flags-file")?;
             let api_signature_files = open_multiple_files(sub_matches, "api-signature-file")?;
             let finalized_flags_file = open_single_file(sub_matches, "finalized-flags-file")?;
-            let allow_flag_file = include_str!("../allow_flag_list.txt");
-            let allow_flag_package = include_str!("../allow_package_list.txt");
+            let non_api_flags = include_str!("../non_api_flags_list.txt");
+            let non_api_flags_packages = include_str!("../non_api_flags_packages.txt");
 
             let exported_flags = validate_exported_flags(
                 parsed_flags_file,
                 api_signature_files,
                 finalized_flags_file,
-                Box::new(allow_flag_file.as_bytes()),
-                Box::new(allow_flag_package.as_bytes()),
+                Box::new(non_api_flags.as_bytes()),
+                Box::new(non_api_flags_packages.as_bytes()),
             )?;
 
             ensure!(
@@ -144,8 +169,14 @@ fn main() -> Result<()> {
                 bail!("argument out is missing");
             };
             let out_file = PathBuf::from(out_file_arg);
-            let allow_flag_file = &include_str!("../allow_flag_list.txt");
-            let filtered_cache = filter_api_flags(cache, Box::new(allow_flag_file.as_bytes()))?;
+            let mut non_api_flags_set =
+                read_flag_from_binary(&include_bytes!("../non_api_flags_list.txt")[..])?;
+            let skip_flags_set =
+                read_flag_from_binary(&include_bytes!("../skip_api_filter_list.txt")[..])?;
+            skip_flags_set.iter().for_each(|flag| {
+                non_api_flags_set.remove(flag);
+            });
+            let filtered_cache = filter_api_flags(cache, &non_api_flags_set)?;
             let parent = out_file
                 .parent()
                 .ok_or(anyhow!("unable to locate parent of output file {}", out_file.display()))?;
@@ -172,14 +203,14 @@ mod tests {
             vec![&include_bytes!("../tests/api-signature-file.txt")[..]];
         let all_flags_to_be_finalized = include_bytes!("../tests/flags.protobuf");
         let already_finalized_flags = include_bytes!("../tests/finalized-flags.txt");
-        let allow_flag_file = "record_finalized_flags.test.boo".as_bytes();
+        let non_api_flags = "record_finalized_flags.test.boo".as_bytes();
         let allow_flag_package = "".as_bytes();
 
         let exported_flags = validate_exported_flags(
             &all_flags_to_be_finalized[..],
             flags_used_with_flaggedapi_annotation,
             &already_finalized_flags[..],
-            allow_flag_file,
+            non_api_flags,
             allow_flag_package,
         )
         .unwrap();

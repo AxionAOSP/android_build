@@ -527,6 +527,16 @@ function _lunch_usage()
     ) 1>&2
 }
 
+function _lunch_store_leftovers()
+{
+    local product=$1
+    local release=$2
+    local variant=$3
+
+    local dot_leftovers="$(gettop)/.leftovers"
+    echo "$product $release $variant" > $dot_leftovers
+}
+
 function lunch()
 {
     if [[ $# -eq 1 && $1 = "--help" ]]; then
@@ -571,6 +581,42 @@ function lunch()
 
     # Validate the selection and set all the environment stuff
     _lunch_meat $product $release $variant
+
+    _lunch_store_leftovers $product $release $variant
+}
+
+function leftovers()
+{
+    if [ -t 1 ] && [ $(tput colors) -ge 8 ]; then
+        local style_reset="$(tput sgr0)"
+        local style_red="$(tput setaf 1)"
+        local style_green="$(tput setaf 2)"
+        local style_bold="$(tput bold)"
+    fi
+    local FAIL="${style_bold}${style_red}ERROR${style_reset}"
+    local INFO="${style_bold}${style_green}INFO${style_reset}"
+
+    if [[ $# -eq 1 && ($1 = "--help" || $1 == "-h" || $1 == "help") ]]; then
+        (
+            echo "The leftovers command restores your previous lunch choices, if found."
+            echo
+            echo "Set ${style_bold}USE_LEFTOVERS=1${style_reset} in your environment to automatically run this"
+            echo "from ${style_bold}build/envsetup.sh${style_reset}."
+        ) 1>&2
+        return
+    fi
+
+    local dot_leftovers="$(gettop)/.leftovers"
+    if [ ! -f $dot_leftovers ]; then
+        echo -e "$FAIL: .leftovers not found. Run ${style_bold}lunch${style_reset} first."
+        return 1
+    fi
+
+    local product release variant
+    IFS=" " read -r product release variant < "$dot_leftovers"
+
+    echo "$INFO: Loading previous lunch: ${style_bold}$product $release $variant${style_reset}"
+    lunch $product $release $variant
 }
 
 unset ANDROID_LUNCH_COMPLETION_PRODUCT_CACHE
@@ -1114,4 +1160,6 @@ set_global_paths
 source_vendorsetup
 addcompletions
 
-
+if [[ "$USE_LEFTOVERS" -eq 1 ]]; then
+  leftovers
+fi

@@ -175,6 +175,19 @@ mod tests {
     const EXPORTED_PROD_HEADER_EXPECTED: &str = r#"
 #pragma once
 
+// Avoid destruction for thread safety.
+// Only enable this with clang.
+#if defined(__clang__)
+#ifndef ACONFIG_NO_DESTROY
+#define ACONFIG_NO_DESTROY [[clang::no_destroy]]
+#endif
+#else
+#warning "not built with clang disable no_destroy"
+#ifndef ACONFIG_NO_DESTROY
+#define ACONFIG_NO_DESTROY
+#endif
+#endif
+
 #ifndef COM_ANDROID_ACONFIG_TEST
 #define COM_ANDROID_ACONFIG_TEST(FLAG) COM_ANDROID_ACONFIG_TEST_##FLAG
 #endif
@@ -216,7 +229,7 @@ public:
     virtual bool enabled_rw() = 0;
 };
 
-extern std::unique_ptr<flag_provider_interface> provider_;
+ACONFIG_NO_DESTROY extern std::unique_ptr<flag_provider_interface> provider_;
 
 inline bool disabled_ro() {
     return false;
@@ -538,7 +551,7 @@ bool com_android_aconfig_test_enabled_rw();
 #include <android/log.h>
 #define LOG_TAG "aconfig_cpp_codegen"
 #define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-
+#include <atomic>
 #include <vector>
 
 namespace com::android::aconfig::test {
@@ -547,10 +560,13 @@ namespace com::android::aconfig::test {
         public:
 
             flag_provider()
-                : cache_(4, -1)
+                : cache_(4)
                 , boolean_start_index_()
                 , flag_value_file_(nullptr)
                 , package_exists_in_storage_(true) {
+                for (size_t i = 0 ; i < 4; i++) {
+                    cache_[i] = -1;
+                }
 
                 auto package_map_file = aconfig_storage::get_mapped_file(
                     "system",
@@ -601,7 +617,7 @@ namespace com::android::aconfig::test {
             }
 
             virtual bool disabled_rw() override {
-                if (cache_[0] == -1) {
+                if (cache_[0].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
                         return false;
                     }
@@ -615,13 +631,13 @@ namespace com::android::aconfig::test {
                         return false;
                     }
 
-                    cache_[0] = *value;
+                    cache_[0].store(*value, std::memory_order_relaxed);
                 }
-                return cache_[0];
+                return cache_[0].load(std::memory_order_relaxed);
             }
 
             virtual bool disabled_rw_exported() override {
-                if (cache_[1] == -1) {
+                if (cache_[1].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
                         return false;
                     }
@@ -635,13 +651,13 @@ namespace com::android::aconfig::test {
                         return false;
                     }
 
-                    cache_[1] = *value;
+                    cache_[1].store(*value, std::memory_order_relaxed);
                 }
-                return cache_[1];
+                return cache_[1].load(std::memory_order_relaxed);
             }
 
             virtual bool disabled_rw_in_other_namespace() override {
-                if (cache_[2] == -1) {
+                if (cache_[2].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
                         return false;
                     }
@@ -655,9 +671,9 @@ namespace com::android::aconfig::test {
                         return false;
                     }
 
-                    cache_[2] = *value;
+                    cache_[2].store(*value, std::memory_order_relaxed);
                 }
-                return cache_[2];
+                return cache_[2].load(std::memory_order_relaxed);
             }
 
             virtual bool enabled_fixed_ro() override {
@@ -677,7 +693,7 @@ namespace com::android::aconfig::test {
             }
 
             virtual bool enabled_rw() override {
-                if (cache_[3] == -1) {
+                if (cache_[3].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
                         return true;
                     }
@@ -691,13 +707,13 @@ namespace com::android::aconfig::test {
                         return true;
                     }
 
-                    cache_[3] = *value;
+                    cache_[3].store(*value, std::memory_order_relaxed);
                 }
-                return cache_[3];
+                return cache_[3].load(std::memory_order_relaxed);
             }
 
     private:
-        std::vector<int8_t> cache_ = std::vector<int8_t>(4, -1);
+        std::vector<std::atomic_int8_t> cache_;
 
         uint32_t boolean_start_index_;
 

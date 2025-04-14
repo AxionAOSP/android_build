@@ -13,6 +13,7 @@
 #include <string>
 {{ -else- }}
 {{ if readwrite- }}
+#include <atomic>
 #include <vector>
 {{ -endif }}
 {{ -endif }}
@@ -134,10 +135,13 @@ namespace {cpp_namespace} \{
 
         {{ if readwrite- }}
         flag_provider()
-            : cache_({readwrite_count}, -1)
+            : cache_({readwrite_count})
             , boolean_start_index_()
             , flag_value_file_(nullptr)
             , package_exists_in_storage_(true) \{
+            for (size_t i = 0 ; i < {readwrite_count}; i++) \{
+                cache_[i] = -1;
+            }
 
             auto package_map_file = aconfig_storage::get_mapped_file(
                  "{container}",
@@ -186,7 +190,7 @@ namespace {cpp_namespace} \{
         {{ -for item in class_elements }}
         virtual bool {item.flag_name}() override \{
             {{ -if item.readwrite }}
-            if (cache_[{item.readwrite_idx}] == -1) \{
+            if (cache_[{item.readwrite_idx}].load(std::memory_order_relaxed) == -1) \{
                 if (!package_exists_in_storage_) \{
                     return {item.default_value};
                 }
@@ -200,9 +204,9 @@ namespace {cpp_namespace} \{
                     return {item.default_value};
                 }
 
-                cache_[{item.readwrite_idx}] = *value;
+                cache_[{item.readwrite_idx}].store(*value, std::memory_order_relaxed);
             }
-            return cache_[{item.readwrite_idx}];
+            return cache_[{item.readwrite_idx}].load(std::memory_order_relaxed);
             {{ -else }}
             {{ -if item.is_fixed_read_only }}
             return {package_macro}_{item.flag_macro};
@@ -215,7 +219,7 @@ namespace {cpp_namespace} \{
 
     {{ if readwrite- }}
     private:
-        std::vector<int8_t> cache_ = std::vector<int8_t>({readwrite_count}, -1);
+        std::vector<std::atomic_int8_t> cache_;
 
         uint32_t boolean_start_index_;
 
