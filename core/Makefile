@@ -1920,36 +1920,49 @@ kernel_notice_file := $(TARGET_OUT_NOTICE_FILES)/src/kernel.txt
 exclude_target_dirs := apex
 
 # target_notice_file_xml := $(TARGET_OUT_INTERMEDIATES)/NOTICE.xml
-target_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE.xml.gz
-installed_notice_html_or_xml_gz := $(TARGET_OUT)/etc/NOTICE.xml.gz
 
 target_vendor_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR.txt
 target_vendor_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR.xml.gz
-installed_vendor_notice_xml_gz := $(TARGET_OUT_VENDOR)/etc/NOTICE.xml.gz
 
 target_product_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_PRODUCT.txt
 target_product_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_PRODUCT.xml.gz
-installed_product_notice_xml_gz := $(TARGET_OUT_PRODUCT)/etc/NOTICE.xml.gz
 
 target_system_ext_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_SYSTEM_EXT.txt
 target_system_ext_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_SYSTEM_EXT.xml.gz
-installed_system_ext_notice_xml_gz := $(TARGET_OUT_SYSTEM_EXT)/etc/NOTICE.xml.gz
 
 target_odm_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_ODM.txt
 target_odm_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_ODM.xml.gz
-installed_odm_notice_xml_gz := $(TARGET_OUT_ODM)/etc/NOTICE.xml.gz
 
 target_vendor_dlkm_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR_DLKM.txt
 target_vendor_dlkm_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR_DLKM.xml.gz
-installed_vendor_dlkm_notice_xml_gz := $(TARGET_OUT_VENDOR_DLKM)/etc/NOTICE.xml.gz
 
 target_odm_dlkm_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_ODM_DLKM.txt
 target_odm_dlkm_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_ODM_DLKM.xml.gz
-installed_odm_dlkm_notice_xml_gz := $(TARGET_OUT_ODM_DLKM)/etc/NOTICE.xml.gz
 
 target_system_dlkm_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_SYSTEM_DLKM.txt
 target_system_dlkm_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_SYSTEM_DLKM.xml.gz
-installed_system_dlkm_notice_xml_gz := $(TARGET_OUT_SYSTEM_DLKM)/etc/NOTICE.xml.gz
+
+ifeq (,$(DISABLE_NOTICE_XML_GENERATION))
+  target_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE.xml.gz
+  installed_notice_html_or_xml_gz := $(TARGET_OUT)/etc/NOTICE.xml.gz
+  installed_vendor_notice_xml_gz := $(TARGET_OUT_VENDOR)/etc/NOTICE.xml.gz
+  installed_product_notice_xml_gz := $(TARGET_OUT_PRODUCT)/etc/NOTICE.xml.gz
+  installed_system_ext_notice_xml_gz := $(TARGET_OUT_SYSTEM_EXT)/etc/NOTICE.xml.gz
+  installed_odm_notice_xml_gz := $(TARGET_OUT_ODM)/etc/NOTICE.xml.gz
+  installed_vendor_dlkm_notice_xml_gz := $(TARGET_OUT_VENDOR_DLKM)/etc/NOTICE.xml.gz
+  installed_odm_dlkm_notice_xml_gz := $(TARGET_OUT_ODM_DLKM)/etc/NOTICE.xml.gz
+  installed_system_dlkm_notice_xml_gz := $(TARGET_OUT_SYSTEM_DLKM)/etc/NOTICE.xml.gz
+else
+  target_notice_file_xml_gz :=
+  installed_notice_html_or_xml_gz :=
+  installed_vendor_notice_xml_gz :=
+  installed_product_notice_xml_gz :=
+  installed_system_ext_notice_xml_gz :=
+  installed_odm_notice_xml_gz :=
+  installed_vendor_dlkm_notice_xml_gz :=
+  installed_odm_dlkm_notice_xml_gz :=
+  installed_system_dlkm_notice_xml_gz :=
+endif
 
 ALL_INSTALLED_NOTICE_FILES := \
   $(installed_notice_html_or_xml_gz) \
@@ -6302,6 +6315,8 @@ ifdef BUILDING_VENDOR_BOOT_IMAGE
   ifeq (true,$(BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT))
     $(BUILT_TARGET_FILES_DIR): $(INTERNAL_RECOVERY_RAMDISK_FILES_TIMESTAMP)
   endif
+else ifdef BOARD_PREBUILT_VENDOR_BOOTIMAGE
+  $(BUILT_TARGET_FILES_DIR): $(INSTALLED_VENDOR_BOOTIMAGE_TARGET)
 endif
 
 ifdef BUILDING_VENDOR_KERNEL_BOOT_IMAGE

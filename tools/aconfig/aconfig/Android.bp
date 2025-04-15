@@ -16,6 +16,7 @@ rust_defaults {
         "libanyhow",
         "libclap",
         "libitertools",
+        "liblazy_static",
         "libprotobuf",
         "libserde",
         "libserde_json",

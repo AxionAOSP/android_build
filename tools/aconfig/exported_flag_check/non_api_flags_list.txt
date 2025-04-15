@@ -199,6 +199,7 @@ com.android.gms.flags.enable_new_gms
 com.android.gms.flags.enable_optional_gms
 com.android.graphics.flags.icon_load_drawable_return_null_when_uri_decode_fails
 com.android.graphics.hwui.flags.animated_image_drawable_filter_bitmap
+com.android.graphics.surfaceflinger.flags.disable_synthetic_vsync_for_performance
 com.android.hardware.input.key_event_activity_detection
 com.android.hardware.input.manage_key_gestures
 com.android.healthfitness.flags.activity_intensity_db

@@ -366,7 +366,7 @@ $(call add_json_list, VendorPropFiles, $(TARGET_VENDOR_PROP))
 # Do not set ArtTargetIncludeDebugBuild into any value if PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD is not set,
 # to have the same behavior from runtime_libart.mk.
 ifneq ($(PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD),)
-$(call add_json_bool, ArtTargetIncludeDebugBuild, $(PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD))
+$(call add_json_bool, ArtTargetIncludeDebugBuild, $(filter true,$(PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD)))
 endif
 
 _config_enable_uffd_gc := \

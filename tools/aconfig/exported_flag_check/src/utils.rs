@@ -120,6 +120,7 @@ pub(crate) fn filter_api_flags<R: Read>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aconfig_protos::parsed_flags;
 
     #[test]
     fn test_extract_flagged_api_flags() {
@@ -149,7 +150,10 @@ mod tests {
 
     #[test]
     fn test_get_exported_flags_from_binary_proto() {
-        let bytes = include_bytes!("../tests/flags.protobuf");
+        let input = std::str::from_utf8(include_bytes!("../tests/flags.textproto")).unwrap();
+        let parsed_flags = parsed_flags::try_from_text_proto(input).unwrap();
+        let mut bytes = Vec::new();
+        parsed_flags.write_to_vec(&mut bytes).unwrap();
         let flags = get_exported_flags_from_binary_proto(&bytes[..]).unwrap();
         assert_eq!(
             flags,
@@ -164,7 +168,10 @@ mod tests {
 
     #[test]
     fn test_filter_api_flags() {
-        let bytes = include_bytes!("../tests/flags.protobuf");
+        let input = std::str::from_utf8(include_bytes!("../tests/flags.textproto")).unwrap();
+        let parsed_flags = parsed_flags::try_from_text_proto(input).unwrap();
+        let mut bytes = Vec::new();
+        parsed_flags.write_to_vec(&mut bytes).unwrap();
         let allow_flag_file = r#"
         record_finalized_flags.test.boo
         record_finalized_flags.test.not_enabled

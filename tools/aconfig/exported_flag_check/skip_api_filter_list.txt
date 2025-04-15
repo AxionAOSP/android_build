@@ -3,4 +3,5 @@
 // API flag libary. However because of the current setup, this flag should
 // still be in the library. This flag should be removed from the code base
 // after release of the new feature
+com.android.graphics.surfaceflinger.flags.disable_synthetic_vsync_for_performance
 com.android.settingslib.widget.theme.flags.is_expressive_design_enabled

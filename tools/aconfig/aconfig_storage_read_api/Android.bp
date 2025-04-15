@@ -131,10 +131,20 @@ cc_library {
 
 cc_defaults {
     name: "aconfig_lib_cc_shared_link.defaults",
-    shared_libs: select(release_flag("RELEASE_READ_FROM_NEW_STORAGE"), {
-        true: ["libaconfig_storage_read_api_cc"],
-        default: [],
-    }),
+    target: {
+        android: {
+            shared_libs: select(release_flag("RELEASE_READ_FROM_NEW_STORAGE"), {
+                true: ["libaconfig_storage_read_api_cc"],
+                default: [],
+            }),
+        },
+        host: {
+            static_libs: select(release_flag("RELEASE_READ_FROM_NEW_STORAGE"), {
+                true: ["libaconfig_storage_read_api_cc"],
+                default: [],
+            }),
+        },
+    },
 }
 
 cc_defaults {

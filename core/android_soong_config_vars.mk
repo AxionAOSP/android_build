@@ -444,6 +444,7 @@ $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_SENSORTEST,$(if $(FPC_CON
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_SWIPE_ENROL,$(if $(filter 1,$(FPC_CONFIG_SWIPE_ENROL)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TA_FS,$(if $(FPC_CONFIG_TA_FS),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TRUSTY_CLEAN_TA,$(if $(filter 1,$(FPC_CONFIG_TRUSTY_CLEAN_TA)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TRUSTY_EMULATOR,$(if $(filter 1,$(FPC_CONFIG_TRUSTY_EMULATOR)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_TRUSTY_SC,$(if $(filter 1,$(FPC_CONFIG_TRUSTY_SC)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,GOOGLE_CONFIG_PERFORMANCE,$(if $(filter 1,$(GOOGLE_CONFIG_PERFORMANCE)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,GOOGLE_CONFIG_TOUCH_TO_UNLOCK_ANYTIME,$(if $(filter 1,$(GOOGLE_CONFIG_TOUCH_TO_UNLOCK_ANYTIME)),true,false))
