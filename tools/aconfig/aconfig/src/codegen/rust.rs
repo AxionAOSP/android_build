@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use serde::Serialize;
 use tinytemplate::TinyTemplate;
 
-use aconfig_protos::{ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag};
+use aconfig_protos::{
+    ParsedFlagExt, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend, ProtoParsedFlag,
+};
 
 use std::collections::HashMap;
 
-use crate::codegen;
-use crate::codegen::CodegenMode;
-use crate::commands::{should_include_flag, OutputFile};
+use crate::codegen::{self, get_flag_offset_in_storage_file, CodegenMode};
+use crate::commands::OutputFile;
 
 pub fn generate_rust_code<I>(
     package: &str,
@@ -36,9 +37,9 @@ pub fn generate_rust_code<I>(
 where
     I: Iterator<Item = ProtoParsedFlag>,
 {
-    let template_flags: Vec<TemplateParsedFlag> = parsed_flags_iter
+    let template_flags = parsed_flags_iter
         .map(|pf| TemplateParsedFlag::new(package, flag_ids.clone(), &pf))
-        .collect();
+        .collect::<Result<Vec<TemplateParsedFlag>>>()?;
     let has_readwrite = template_flags.iter().any(|item| item.readwrite);
     let container = (template_flags.first().expect("zero template flags").container).to_string();
     let use_package_fingerprint = package_fingerprint.is_some();
@@ -90,23 +91,13 @@ struct TemplateParsedFlag {
 
 impl TemplateParsedFlag {
     #[allow(clippy::nonminimal_bool)]
-    fn new(package: &str, flag_offsets: HashMap<String, u16>, pf: &ProtoParsedFlag) -> Self {
-        let flag_offset = match flag_offsets.get(pf.name()) {
-            Some(offset) => offset,
-            None => {
-                // System/vendor/product RO+disabled flags have no offset in storage files.
-                // Assign placeholder value.
-                if !should_include_flag(pf) {
-                    &0
-                }
-                // All other flags _must_ have an offset.
-                else {
-                    panic!("{}", format!("missing flag offset for {}", pf.name()));
-                }
-            }
-        };
-
-        Self {
+    fn new(package: &str, flag_ids: HashMap<String, u16>, pf: &ProtoParsedFlag) -> Result<Self> {
+        ensure!(
+            pf.metadata.storage() != ProtoFlagStorageBackend::DEVICE_CONFIG,
+            "device config storage backend cannot be used in native codegen for flag {}",
+            pf.fully_qualified_name()
+        );
+        Ok(Self {
             readwrite: pf.permission() == ProtoFlagPermission::READ_WRITE,
             default_value: match pf.state() {
                 ProtoFlagState::ENABLED => "true".to_string(),
@@ -114,11 +105,11 @@ impl TemplateParsedFlag {
             },
             name: pf.name().to_string(),
             container: pf.container().to_string(),
-            flag_offset: *flag_offset,
+            flag_offset: get_flag_offset_in_storage_file(&flag_ids, pf)?,
             device_config_namespace: pf.namespace().to_string(),
             device_config_flag: codegen::create_device_config_ident(package, pf.name())
                 .expect("values checked at flag parse time"),
-        }
+        })
     }
 }
 

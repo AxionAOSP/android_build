@@ -20,10 +20,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use tinytemplate::TinyTemplate;
 
-use crate::codegen;
-use crate::codegen::CodegenMode;
-use crate::commands::{should_include_flag, OutputFile};
-use aconfig_protos::{ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag};
+use crate::codegen::{self, get_flag_offset_in_storage_file, CodegenMode};
+use crate::commands::OutputFile;
+use aconfig_protos::{
+    ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend, ProtoParsedFlag,
+};
 use convert_finalized_flags::{ApiLevel, FinalizedFlag, FinalizedFlagMap};
 use std::collections::HashMap;
 
@@ -48,7 +49,7 @@ where
         .map(|pf| {
             create_flag_element(package, &pf, config.flag_ids.clone(), &config.finalized_flags)
         })
-        .collect();
+        .collect::<Result<Vec<FlagElement>>>()?;
     let namespace_flags = gen_flags_by_namespace(&flag_elements);
     let properties_set: BTreeSet<String> =
         flag_elements.iter().map(|fe| format_property_name(&fe.device_config_namespace)).collect();
@@ -170,33 +171,17 @@ struct FlagElement {
     pub properties: String,
     pub finalized_sdk_present: bool,
     pub finalized_sdk_check: String,
+    pub use_device_config: bool,
 }
 
 fn create_flag_element(
     package: &str,
     pf: &ProtoParsedFlag,
-    flag_offsets: HashMap<String, u16>,
+    flag_ids: HashMap<String, u16>,
     finalized_flags: &FinalizedFlagMap,
-) -> FlagElement {
+) -> Result<FlagElement> {
     let device_config_flag = codegen::create_device_config_ident(package, pf.name())
         .expect("values checked at flag parse time");
-
-    let no_assigned_offset = !should_include_flag(pf);
-
-    let flag_offset = match flag_offsets.get(pf.name()) {
-        Some(offset) => offset,
-        None => {
-            // System/vendor/product RO+disabled flags have no offset in storage files.
-            // Assign placeholder value.
-            if no_assigned_offset {
-                &0
-            }
-            // All other flags _must_ have an offset.
-            else {
-                panic!("{}", format!("missing flag offset for {}", pf.name()));
-            }
-        }
-    };
 
     // An empty map is provided if check_api_level is disabled.
     let (finalized_sdk_present, finalized_sdk_value) = if !finalized_flags.is_empty() {
@@ -210,20 +195,21 @@ fn create_flag_element(
     };
     let finalized_sdk_check = finalized_sdk_value.conditional();
 
-    FlagElement {
+    Ok(FlagElement {
         container: pf.container().to_string(),
         default_value: pf.state() == ProtoFlagState::ENABLED,
         device_config_namespace: pf.namespace().to_string(),
         device_config_flag,
         flag_name: pf.name().to_string(),
         flag_name_constant_suffix: pf.name().to_ascii_uppercase(),
-        flag_offset: *flag_offset,
+        flag_offset: get_flag_offset_in_storage_file(&flag_ids, pf)?,
         is_read_write: pf.permission() == ProtoFlagPermission::READ_WRITE,
         method_name: format_java_method_name(pf.name()),
         properties: format_property_name(pf.namespace()),
         finalized_sdk_present,
         finalized_sdk_check,
-    }
+        use_device_config: pf.metadata.storage() == ProtoFlagStorageBackend::DEVICE_CONFIG,
+    })
 }
 
 fn format_java_method_name(flag_name: &str) -> String {

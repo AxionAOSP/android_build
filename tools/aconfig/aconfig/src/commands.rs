@@ -446,9 +446,9 @@ where
             return Err(anyhow::anyhow!("encountered a flag not in current package"));
         }
 
-        // put a cap on how many flags a package can contain to 65535
-        if flag_idx > u16::MAX as u32 {
-            return Err(anyhow::anyhow!("the number of flags in a package cannot exceed 65535"));
+        // put a cap on how many flags a package can contain to 65534
+        if flag_idx >= u16::MAX as u32 {
+            return Err(anyhow::anyhow!("the number of flags in a package cannot exceed 65534"));
         }
 
         if should_include_flag(pf) {
@@ -489,17 +489,18 @@ fn extract_flag_names(flags: ProtoParsedFlags) -> Result<Vec<String>> {
         .collect::<Vec<_>>())
 }
 
-// Exclude system/vendor/product flags that are RO+disabled.
+// Check if a flag should be managed by aconfigd
 pub fn should_include_flag(pf: &ProtoParsedFlag) -> bool {
-    let should_filter_container = pf.container == Some("vendor".to_string())
+    let is_platform_container = pf.container == Some("vendor".to_string())
         || pf.container == Some("system".to_string())
         || pf.container == Some("system_ext".to_string())
         || pf.container == Some("product".to_string());
 
-    let disabled_ro = pf.state == Some(ProtoFlagState::DISABLED.into())
+    let is_disabled_ro = pf.state == Some(ProtoFlagState::DISABLED.into())
         && pf.permission == Some(ProtoFlagPermission::READ_ONLY.into());
 
-    !should_filter_container || !disabled_ro
+    !((is_platform_container && is_disabled_ro)
+        || pf.metadata.storage() == ProtoFlagStorageBackend::DEVICE_CONFIG)
 }
 
 #[cfg(test)]
@@ -1110,7 +1111,7 @@ mod tests {
 
     #[test]
     fn test_assign_flag_ids() {
-        let parsed_flags = crate::test::parse_test_flags();
+        let mut parsed_flags = crate::test::parse_test_flags();
         let package = find_unique_package(&parsed_flags.parsed_flag).unwrap().to_string();
         let flag_ids = assign_flag_ids(&package, parsed_flags.parsed_flag.iter()).unwrap();
         let expected_flag_ids = HashMap::from([
@@ -1122,6 +1123,25 @@ mod tests {
             (String::from("enabled_ro"), 5_u16),
             (String::from("enabled_ro_exported"), 6_u16),
             (String::from("enabled_rw"), 7_u16),
+        ]);
+        assert_eq!(flag_ids, expected_flag_ids);
+
+        let pf = parsed_flags
+            .parsed_flag
+            .iter_mut()
+            .find(|pf| pf.name() == "disabled_rw_in_other_namespace")
+            .unwrap();
+        let m = pf.metadata.as_mut().unwrap();
+        m.set_storage(ProtoFlagStorageBackend::DEVICE_CONFIG);
+        let flag_ids = assign_flag_ids(&package, parsed_flags.parsed_flag.iter()).unwrap();
+        let expected_flag_ids = HashMap::from([
+            (String::from("disabled_rw"), 0_u16),
+            (String::from("disabled_rw_exported"), 1_u16),
+            (String::from("enabled_fixed_ro"), 2_u16),
+            (String::from("enabled_fixed_ro_exported"), 3_u16),
+            (String::from("enabled_ro"), 4_u16),
+            (String::from("enabled_ro_exported"), 5_u16),
+            (String::from("enabled_rw"), 6_u16),
         ]);
         assert_eq!(flag_ids, expected_flag_ids);
     }

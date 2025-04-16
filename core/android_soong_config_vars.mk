@@ -417,6 +417,7 @@ $(call soong_config_set_bool,qcom_bluetooth,UART_USE_TERMIOS_AFC,$(if $(filter t
 # Flags for Fingerprint HAL
 $(call soong_config_set,fp_hal_feature,FPC_CONFIG_KEYMASTER_APP_PATH,$(FPC_CONFIG_KEYMASTER_APP_PATH))
 $(call soong_config_set,fp_hal_feature,FPC_CONFIG_KEYMASTER_NAME,$(FPC_CONFIG_KEYMASTER_NAME))
+$(call soong_config_set,fp_hal_feature,FPC_CONFIG_SENSE_TOUCH_CALIBRATION_PATH,$(FPC_CONFIG_SENSE_TOUCH_CALIBRATION_PATH))
 $(call soong_config_set,fp_hal_feature,FPC_MODULE_TYPE,$(FPC_MODULE_TYPE))
 $(call soong_config_set,fp_hal_feature,FPC_PLATFORM_TARGET,$(FPC_PLATFORM_TARGET))
 $(call soong_config_set,fp_hal_feature,FPC_TEE_RUNTIME,$(FPC_TEE_RUNTIME))
@@ -434,7 +435,9 @@ $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_DEBUG,$(if $(filter 1,$(F
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENGINEERING,$(if $(FPC_CONFIG_ENGINEERING),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENROL_TIMEOUT,$(if $(filter 1,$(FPC_CONFIG_ENROL_TIMEOUT)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_FIDO_AUTH,$(if $(FPC_CONFIG_FIDO_AUTH),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_FIDO_AUTH_VER_GMRZ,$(if $(filter 1,$(FPC_CONFIG_FIDO_AUTH_VER_GMRZ)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_GOOGLE_CUSTOMIZE,$(if $(filter 1,$(FPC_CONFIG_GOOGLE_CUSTOMIZE)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_GOOGLE_RELEASE,$(if $(filter 1,$(FPC_CONFIG_GOOGLE_RELEASE)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NAVIGATION,$(if $(FPC_CONFIG_NAVIGATION),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NO_ALGO,$(if $(FPC_CONFIG_NO_ALGO),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NO_SENSOR,$(if $(FPC_CONFIG_NO_SENSOR),true,false))

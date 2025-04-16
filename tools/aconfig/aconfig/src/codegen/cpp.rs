@@ -20,11 +20,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tinytemplate::TinyTemplate;
 
-use aconfig_protos::{ProtoFlagPermission, ProtoFlagState, ProtoParsedFlag};
+use aconfig_protos::{
+    ParsedFlagExt, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend, ProtoParsedFlag,
+};
 
-use crate::codegen;
-use crate::codegen::CodegenMode;
-use crate::commands::{should_include_flag, OutputFile};
+use crate::codegen::{self, get_flag_offset_in_storage_file, CodegenMode};
+use crate::commands::OutputFile;
 
 pub fn generate_cpp_code<I>(
     package: &str,
@@ -36,9 +37,9 @@ where
     I: Iterator<Item = ProtoParsedFlag>,
 {
     let mut readwrite_count = 0;
-    let class_elements: Vec<ClassElement> = parsed_flags_iter
+    let class_elements = parsed_flags_iter
         .map(|pf| create_class_element(package, &pf, flag_ids.clone(), &mut readwrite_count))
-        .collect();
+        .collect::<Result<Vec<ClassElement>>>()?;
     let readwrite = readwrite_count > 0;
     let has_fixed_read_only = class_elements.iter().any(|item| item.is_fixed_read_only);
     let header = package.replace('.', "_");
@@ -123,25 +124,13 @@ fn create_class_element(
     pf: &ProtoParsedFlag,
     flag_ids: HashMap<String, u16>,
     rw_count: &mut i32,
-) -> ClassElement {
-    let no_assigned_offset = !should_include_flag(pf);
-
-    let flag_offset = match flag_ids.get(pf.name()) {
-        Some(offset) => offset,
-        None => {
-            // System/vendor/product RO+disabled flags have no offset in storage files.
-            // Assign placeholder value.
-            if no_assigned_offset {
-                &0
-            }
-            // All other flags _must_ have an offset.
-            else {
-                panic!("{}", format!("missing flag offset for {}", pf.name()));
-            }
-        }
-    };
-
-    ClassElement {
+) -> Result<ClassElement> {
+    ensure!(
+        pf.metadata.storage() != ProtoFlagStorageBackend::DEVICE_CONFIG,
+        "device config storage backend cannot be used in native codegen for flag {}",
+        pf.fully_qualified_name()
+    );
+    Ok(ClassElement {
         readwrite_idx: if pf.permission() == ProtoFlagPermission::READ_WRITE {
             let index = *rw_count;
             *rw_count += 1;
@@ -158,12 +147,12 @@ fn create_class_element(
         },
         flag_name: pf.name().to_string(),
         flag_macro: pf.name().to_uppercase(),
-        flag_offset: *flag_offset,
+        flag_offset: get_flag_offset_in_storage_file(&flag_ids, pf)?,
         device_config_namespace: pf.namespace().to_string(),
         device_config_flag: codegen::create_device_config_ident(package, pf.name())
             .expect("values checked at flag parse time"),
         container: pf.container().to_string(),
-    }
+    })
 }
 
 #[cfg(test)]
