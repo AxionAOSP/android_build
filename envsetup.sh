@@ -533,7 +533,7 @@ function _lunch_store_leftovers()
     local release=$2
     local variant=$3
 
-    local dot_leftovers="$(gettop)/.leftovers"
+    local dot_leftovers="$(getoutdir)/.leftovers"
     echo "$product $release $variant" > $dot_leftovers
 }
 
@@ -606,7 +606,19 @@ function leftovers()
         return
     fi
 
-    local dot_leftovers="$(gettop)/.leftovers"
+    local dot_leftovers="$(getoutdir)/.leftovers"
+
+    # seamlessly migrate old .leftovers location
+    local old_leftovers="$(gettop)/.leftovers"
+    if [[ -e $old_leftovers ]]
+    then
+        if [[ -e $dot_leftovers ]]; then
+            rm $old_leftovers
+        else
+            mv $old_leftovers $dot_leftovers
+        fi
+    fi
+
     if [ ! -f $dot_leftovers ]; then
         echo -e "$FAIL: .leftovers not found. Run ${style_bold}lunch${style_reset} first."
         return 1

@@ -3415,6 +3415,112 @@ endif
 endif  # PRODUCT_FSVERITY_GENERATE_METADATA
 
 
+# Treble Labeling Test
+platform-preinstalled-apps-patterns := \
+  $(TARGET_OUT)/priv-app/%.apk \
+  $(TARGET_OUT)/app/%.apk \
+
+ifdef BUILDING_SYSTEM_EXT_IMAGE
+platform-preinstalled-apps-patterns += \
+  $(TARGET_OUT_SYSTEM_EXT)/priv-app/%.apk \
+  $(TARGET_OUT_SYSTEM_EXT)/app/%.apk \
+
+endif
+
+ifdef BUILDING_PRODUCT_IMAGE
+platform-preinstalled-apps-patterns += \
+  $(TARGET_OUT_PRODUCT)/priv-app/%.apk \
+  $(TARGET_OUT_PRODUCT)/app/%.apk \
+
+endif
+
+platform-preinstalled-apps := $(sort $(filter \
+  $(platform-preinstalled-apps-patterns), \
+  $(ALL_DEFAULT_INSTALLED_MODULES)))
+
+
+vendor-preinstalled-apps-patterns := \
+  $(TARGET_OUT_VENDOR)/priv-app/%.apk \
+  $(TARGET_OUT_VENDOR)/app/%.apk \
+
+ifdef BUILDING_ODM_IMAGE
+vendor-preinstalled-apps-patterns += \
+  $(TARGET_OUT_ODM)/priv-app/%.apk \
+  $(TARGET_OUT_ODM)/app/%.apk \
+
+endif
+
+vendor-preinstalled-apps := $(sort $(filter \
+  $(vendor-preinstalled-apps-patterns), \
+  $(ALL_DEFAULT_INSTALLED_MODULES)))
+
+sepolicy-binary-without-vendor := $(call intermediates-dir-for,ETC,precompiled_sepolicy_without_vendor)/precompiled_sepolicy_without_vendor
+sepolicy-binary := $(call intermediates-dir-for,ETC,precompiled_sepolicy)/precompiled_sepolicy
+
+platform-seapp-contexts := $(call intermediates-dir-for,ETC,plat_seapp_contexts)/plat_seapp_contexts
+
+ifdef BUILDING_SYSTEM_EXT_IMAGE
+platform-seapp-contexts += $(call intermediates-dir-for,ETC,system_ext_seapp_contexts)/system_ext_seapp_contexts
+endif
+
+ifdef BUILDING_PRODUCT_IMAGE
+platform-seapp-contexts += $(call intermediates-dir-for,ETC,product_seapp_contexts)/product_seapp_contexts
+endif
+
+vendor-seapp-contexts := $(call intermediates-dir-for,ETC,vendor_seapp_contexts)/vendor_seapp_contexts
+
+ifdef BUILDING_ODM_IMAGE
+vendor-seapp-contexts += $(call intermediates-dir-for,ETC,odm_seapp_contexts)/odm_seapp_contexts
+endif
+
+vendor-file-contexts := $(call intermediates-dir-for,ETC,vendor_file_contexts)/vendor_file_contexts
+
+ifdef BUILDING_ODM_IMAGE
+vendor-file-contexts += $(call intermediates-dir-for,ETC,odm_file_contexts)/odm_file_contexts
+endif
+
+check-selinux-treble-labeling.timestamp := $(call intermediates-dir-for,PACKAGING,check-selinux-treble-labeling)/check-selinux-treble-labeling.timestamp
+
+$(check-selinux-treble-labeling.timestamp): PRIVATE_PLATFORM_APPS := $(platform-preinstalled-apps)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_APPS := $(vendor-preinstalled-apps)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_SEPOLICY_WITHOUT_VENDOR := $(sepolicy-binary-without-vendor)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_SEPOLICY := $(sepolicy-binary)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_PLATFORM_SEAPP_CONTEXTS := $(platform-seapp-contexts)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_SEAPP_CONTEXTS := $(vendor-seapp-contexts)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_FILE_CONTEXTS := $(vendor-file-contexts)
+$(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_labeling_tests \
+    $(platform-preinstalled-apps) $(vendor-preinstalled-apps) \
+    $(platform-sepolicy-binary) $(sepolicy-binary) $(sepolicy-binary-without-vendor) \
+    $(platform-seapp-contexts) $(vendor-seapp-contexts) $(vendor-file-contexts) \
+    $(AAPT2)
+	@rm -rf $@
+	@echo $(PRIVATE_PLATFORM_APPS) > $@.platform_apps.txt
+	@echo $(PRIVATE_VENDOR_APPS) > $@.vendor_apps.txt
+	$(hide) $< --platform_apks $@.platform_apps.txt --vendor_apks $@.vendor_apps.txt \
+    --precompiled_sepolicy_without_vendor $(PRIVATE_SEPOLICY_WITHOUT_VENDOR) \
+    --precompiled_sepolicy $(PRIVATE_SEPOLICY) \
+    --platform_seapp_contexts $(PRIVATE_PLATFORM_SEAPP_CONTEXTS) \
+    --vendor_seapp_contexts $(PRIVATE_VENDOR_SEAPP_CONTEXTS) \
+    --vendor_file_contexts $(PRIVATE_VENDOR_FILE_CONTEXTS) \
+    --aapt2_path $(AAPT2) > $@
+
+.PHONY: check-selinux-treble-labeling
+check-selinux-treble-labeling: $(check-selinux-treble-labeling.timestamp)
+
+ifeq ($(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING),true)
+droidcore: $(check-selinux-treble-labeling)
+endif  # PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING
+
+platform-preinstalled-apps-patterns :=
+platform-preinstalled-apps :=
+vendor-preinstalled-apps-patterns :=
+vendor-preinstalled-apps :=
+check-selinux-treble-labeling.timestamp :=
+platform-sepolicy-binary :=
+sepolicy-binary :=
+platform-seapp-contexts :=
+vendor-seapp-contexts :=
+
 # -----------------------------------------------------------------
 # system image
 

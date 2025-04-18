@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -45,8 +45,18 @@ pub fn generate_java_code<I>(
 where
     I: Iterator<Item = ProtoParsedFlag>,
 {
+    let mut use_device_config = false;
+    let mut use_aconfigd = false;
     let flag_elements: Vec<FlagElement> = parsed_flags_iter
         .map(|pf| {
+            use_device_config |= pf.metadata.storage() == ProtoFlagStorageBackend::DEVICE_CONFIG;
+            use_aconfigd |= pf.metadata.storage() == ProtoFlagStorageBackend::ACONFIGD;
+            ensure!(
+                !(use_device_config && use_aconfigd),
+                "Package {} cannot contain both device_config and new storage stored flags",
+                package
+            );
+
             create_flag_element(package, &pf, config.flag_ids.clone(), &config.finalized_flags)
         })
         .collect::<Result<Vec<FlagElement>>>()?;
@@ -72,6 +82,7 @@ where
         is_platform_container,
         package_fingerprint: format!("0x{:X}L", config.package_fingerprint),
         single_exported_file: config.single_exported_file,
+        use_device_config,
     };
     let mut template = TinyTemplate::new();
     if library_exported && config.single_exported_file {
@@ -149,6 +160,7 @@ struct Context {
     pub is_platform_container: bool,
     pub package_fingerprint: String,
     pub single_exported_file: bool,
+    pub use_device_config: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -171,7 +183,6 @@ struct FlagElement {
     pub properties: String,
     pub finalized_sdk_present: bool,
     pub finalized_sdk_check: String,
-    pub use_device_config: bool,
 }
 
 fn create_flag_element(
@@ -208,7 +219,6 @@ fn create_flag_element(
         properties: format_property_name(pf.namespace()),
         finalized_sdk_present,
         finalized_sdk_check,
-        use_device_config: pf.metadata.storage() == ProtoFlagStorageBackend::DEVICE_CONFIG,
     })
 }
 
@@ -1715,6 +1725,38 @@ mod tests {
                 &String::from_utf8(file.contents.clone()).unwrap()
             ),
             "ExportedFlags content is not correct"
+        );
+    }
+
+    #[test]
+    fn test_mix_device_config_and_new_storage_flags() {
+        let mut parsed_flags = crate::test::parse_test_flags();
+        parsed_flags.parsed_flag[0].set_permission(ProtoFlagPermission::READ_WRITE);
+        let m = parsed_flags.parsed_flag[0].metadata.as_mut().unwrap();
+        m.set_storage(ProtoFlagStorageBackend::DEVICE_CONFIG);
+        parsed_flags.parsed_flag[1].set_permission(ProtoFlagPermission::READ_WRITE);
+        let m = parsed_flags.parsed_flag[1].metadata.as_mut().unwrap();
+        m.set_storage(ProtoFlagStorageBackend::ACONFIGD);
+
+        let flag_ids =
+            assign_flag_ids(crate::test::TEST_PACKAGE, parsed_flags.parsed_flag.iter()).unwrap();
+
+        let config = JavaCodegenConfig {
+            codegen_mode: CodegenMode::Production,
+            flag_ids,
+            package_fingerprint: 5801144784618221668,
+            single_exported_file: false,
+            finalized_flags: FinalizedFlagMap::new(),
+        };
+        let error = generate_java_code(
+            crate::test::TEST_PACKAGE,
+            parsed_flags.parsed_flag.into_iter(),
+            config,
+        )
+        .unwrap_err();
+        assert_eq!(
+            format!("{:?}", error),
+            "Package com.android.aconfig.test cannot contain both device_config and new storage stored flags",
         );
     }
 

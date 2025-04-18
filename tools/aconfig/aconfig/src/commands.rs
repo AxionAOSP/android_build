@@ -57,6 +57,7 @@ impl Input {
     }
 }
 
+#[derive(Debug)]
 pub struct OutputFile {
     pub path: PathBuf, // relative to some root directory only main knows about
     pub contents: Vec<u8>,

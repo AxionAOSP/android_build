@@ -537,10 +537,18 @@ endif
 # APEX compression can be forcibly enabled (resp. disabled) by
 # setting OVERRIDE_PRODUCT_COMPRESSED_APEX to true (resp. false), e.g. by
 # setting the OVERRIDE_PRODUCT_COMPRESSED_APEX environment variable.
+
+_default_compressed_apex := true
+# To mount APEXes before /data partition is mounted, there should be no compressed
+# apexes.
+ifeq (true,$(RELEASE_APEX_MOUNT_BEFORE_DATA))
+  _default_compressed_apex := false
+endif
+
 ifdef OVERRIDE_PRODUCT_COMPRESSED_APEX
   PRODUCT_COMPRESSED_APEX := $(OVERRIDE_PRODUCT_COMPRESSED_APEX)
 else ifeq (,$(PRODUCT_COMPRESSED_APEX))
-  PRODUCT_COMPRESSED_APEX := true
+  PRODUCT_COMPRESSED_APEX := $(_default_compressed_apex)
 endif
 
 ifdef OVERRIDE_PRODUCT_DEFAULT_APEX_PAYLOAD_TYPE

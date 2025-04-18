@@ -610,6 +610,8 @@ $(call end_json_map)
 
 $(call add_json_list, ProductHostPackages, $(PRODUCT_HOST_PACKAGES))
 
+$(call add_json_bool, EnforceSELinuxTrebleLabeling, $(filter true,$(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING)))
+
 $(call json_end)
 
 $(file >$(SOONG_VARIABLES).tmp,$(json_contents))

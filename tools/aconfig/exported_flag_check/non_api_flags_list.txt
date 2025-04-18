@@ -10,7 +10,6 @@ android.app.admin.flags.set_keyguard_disabled_features_coexistence
 android.app.admin.flags.set_permission_grant_state_coexistence
 android.app.app_restrictions_api
 android.app.enforce_pic_testmode_protocol
-android.app.pic_uses_shared_memory
 android.app.pinner_service_client_api
 android.app.supervision.flags.deprecate_dpm_supervision_apis
 android.app.supervision.flags.enable_app_approval
@@ -59,7 +58,6 @@ android.companion.new_association_builder
 android.companion.ongoing_perm_sync
 android.companion.virtualdevice.flags.camera_multiple_input_streams
 android.companion.virtualdevice.flags.notifications_for_device_streaming
-android.companion.virtualdevice.flags.viewconfiguration_apis
 android.content.pm.always_load_past_certs_v4
 android.content.pm.get_package_storage_stats
 android.content.res.always_false
@@ -162,7 +160,6 @@ com.android.adservices.ondevicepersonalization.flags.on_device_personalization_a
 com.android.appsearch.flags.app_open_event_indexer_enabled
 com.android.appsearch.flags.apps_indexer_enabled
 com.android.appsearch.flags.enable_all_package_indexing_on_indexer_update
-com.android.appsearch.flags.enable_app_functions
 com.android.appsearch.flags.enable_app_functions_schema_parser
 com.android.appsearch.flags.enable_app_open_events_indexer_check_prior_attempt
 com.android.appsearch.flags.enable_app_search_manage_blob_files
@@ -210,8 +207,6 @@ com.android.healthfitness.flags.cycle_phases
 com.android.healthfitness.flags.development_database
 com.android.healthfitness.flags.ecosystem_metrics
 com.android.healthfitness.flags.ecosystem_metrics_db_changes
-com.android.healthfitness.flags.exercise_segment_weight
-com.android.healthfitness.flags.exercise_segment_weight_db
 com.android.healthfitness.flags.export_import
 com.android.healthfitness.flags.export_import_fast_follow
 com.android.healthfitness.flags.export_import_nice_to_have
@@ -219,12 +214,9 @@ com.android.healthfitness.flags.expressive_theming_enabled
 com.android.healthfitness.flags.extend_export_import_telemetry
 com.android.healthfitness.flags.health_connect_mappings
 com.android.healthfitness.flags.immediate_export
-com.android.healthfitness.flags.launch_onboarding_activity
 com.android.healthfitness.flags.logcat_censor_iae
 com.android.healthfitness.flags.new_information_architecture
 com.android.healthfitness.flags.onboarding
-com.android.healthfitness.flags.personal_health_record_database
-com.android.healthfitness.flags.personal_health_record_disable_d2d
 com.android.healthfitness.flags.personal_health_record_disable_export_import
 com.android.healthfitness.flags.personal_health_record_enable_d2d_and_export_import
 com.android.healthfitness.flags.personal_health_record_enable_export_import
@@ -241,14 +233,11 @@ com.android.healthfitness.flags.phr_fhir_extension_validation
 com.android.healthfitness.flags.phr_fhir_oneof_validation
 com.android.healthfitness.flags.phr_fhir_primitive_type_validation
 com.android.healthfitness.flags.phr_fhir_resource_validator_use_weak_reference
-com.android.healthfitness.flags.phr_fhir_structural_validation
 com.android.healthfitness.flags.phr_fhir_validation_disallow_empty_objects_arrays
 com.android.healthfitness.flags.phr_read_medical_resources_fix_query_limit
-com.android.healthfitness.flags.phr_upsert_fix_parcel_size_calculation
 com.android.healthfitness.flags.phr_upsert_fix_use_shared_memory
 com.android.healthfitness.flags.refactor_aggregations
 com.android.healthfitness.flags.single_user_permission_intent_tracker
-com.android.healthfitness.flags.smoking
 com.android.healthfitness.flags.smoking_db
 com.android.healthfitness.flags.step_tracking_enabled
 com.android.healthfitness.flags.symptoms
@@ -273,7 +262,6 @@ com.android.media.extractor.flags.extractor_mp4_enable_apv
 com.android.media.extractor.flags.extractor_sniff_midi_optimizations
 com.android.media.flags.enable_cross_user_routing_in_media_router2
 com.android.media.flags.enable_notifying_activity_manager_with_media_session_status_change
-com.android.media.flags.enable_suggested_device_api
 com.android.media.flags.enable_use_of_singleton_audio_manager_route_controller
 com.android.media.metrics.flags.mediametrics_to_module
 com.android.media.projection.flags.media_projection_connected_display
@@ -343,7 +331,6 @@ com.android.wifi.flags.shared_connectivity_broadcast_receiver_test_api
 com.android.wifi.flags.wep_disabled_in_apm
 com.android.window.flags.fix_hide_overlay_api
 com.android.window.flags.untrusted_embedding_state_sharing
-com.android.window.flags.update_host_input_transfer_token
 com.fuchsia.bluetooth.flags.a2dp_lhdc_api
 com.fuchsia.bluetooth.flags.aics_api
 com.fuchsia.bluetooth.flags.allow_switching_hid_and_hogp
@@ -368,7 +355,6 @@ com.fuchsia.bluetooth.flags.metadata_api_microphone_for_call_enabled
 com.fuchsia.bluetooth.flags.settings_can_control_hap_preset
 com.fuchsia.bluetooth.flags.socket_settings_api
 com.fuchsia.bluetooth.flags.support_bluetooth_quality_report_v6
-com.fuchsia.bluetooth.flags.support_exclusive_manager
 com.fuchsia.bluetooth.flags.support_metadata_device_types_apis
 com.fuchsia.bluetooth.flags.support_remote_device_metadata
 com.fuchsia.bluetooth.flags.unix_file_socket_creation_failure
