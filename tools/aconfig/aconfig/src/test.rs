@@ -265,7 +265,7 @@ parsed_flag {
     pub fn parse_read_only_test_flags() -> ProtoParsedFlags {
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.test",
-            Some("system"),
+            "system",
             vec![Input {
                 source: "tests/read_only_test.aconfig".to_string(),
                 reader: Box::new(include_bytes!("../tests/read_only_test.aconfig").as_slice()),
@@ -284,7 +284,7 @@ parsed_flag {
     pub fn parse_test_flags() -> ProtoParsedFlags {
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.test",
-            Some("system"),
+            "system",
             vec![Input {
                 source: "tests/test.aconfig".to_string(),
                 reader: Box::new(include_bytes!("../tests/test.aconfig").as_slice()),
@@ -309,7 +309,7 @@ parsed_flag {
     pub fn parse_second_package_flags() -> ProtoParsedFlags {
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.second_test",
-            Some("system"),
+            "system",
             vec![Input {
                 source: "tests/test_second_package.aconfig".to_string(),
                 reader: Box::new(include_bytes!("../tests/test_second_package.aconfig").as_slice()),

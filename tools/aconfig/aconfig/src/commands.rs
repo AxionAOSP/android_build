@@ -20,6 +20,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use protobuf::Message;
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::Hasher;
 use std::io::Read;
 use std::path::PathBuf;
@@ -31,7 +32,7 @@ use crate::codegen::CodegenMode;
 use crate::dump::{DumpFormat, DumpPredicate};
 use crate::storage::generate_storage_file;
 use aconfig_protos::{
-    ParsedFlagExt, ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend,
+    ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend,
     ProtoParsedFlag, ProtoParsedFlags, ProtoTracepoint,
 };
 use aconfig_storage_file::sip_hasher13::SipHasher13;
@@ -54,6 +55,12 @@ impl Input {
 
     fn error_context(&self) -> String {
         format!("failed to parse {}", self.source)
+    }
+}
+
+impl fmt::Debug for Input {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.source)
     }
 }
 
@@ -93,7 +100,7 @@ fn assign_storage_backend(pf: &mut ProtoParsedFlag) -> Result<()> {
 
 pub fn parse_flags(
     package: &str,
-    container: Option<&str>,
+    container: &str,
     declarations: Vec<Input>,
     values: Vec<Input>,
     default_permission: ProtoFlagPermission,
@@ -117,24 +124,20 @@ pub fn parse_flags(
             package,
             flag_declarations.package()
         );
-        if let Some(c) = container {
-            ensure!(
-                c == flag_declarations.container(),
-                "failed to parse {}: expected container {}, got {}",
-                input.source,
-                c,
-                flag_declarations.container()
-            );
-        }
+        ensure!(
+            container == flag_declarations.container(),
+            "failed to parse {}: expected container {}, got {}",
+            input.source,
+            container,
+            flag_declarations.container()
+        );
         for mut flag_declaration in flag_declarations.flag.into_iter() {
             aconfig_protos::flag_declaration::verify_fields(&flag_declaration)
                 .with_context(|| input.error_context())?;
 
             // create ParsedFlag using FlagDeclaration and default values
             let mut parsed_flag = ProtoParsedFlag::new();
-            if let Some(c) = container {
-                parsed_flag.set_container(c.to_string());
-            }
+            parsed_flag.set_container(container.to_string());
             parsed_flag.set_package(package.to_string());
             parsed_flag.set_name(flag_declaration.take_name());
             parsed_flag.set_namespace(flag_declaration.take_namespace());
@@ -320,53 +323,10 @@ pub fn create_storage(
     generate_storage_file(container, parsed_flags_vec.iter(), file, version)
 }
 
-pub fn create_device_config_defaults(mut input: Input) -> Result<Vec<u8>> {
-    let parsed_flags = input.try_parse_flags()?;
-    let mut output = Vec::new();
-    for parsed_flag in parsed_flags
-        .parsed_flag
-        .into_iter()
-        .filter(|pf| pf.permission() == ProtoFlagPermission::READ_WRITE)
-    {
-        let line = format!(
-            "{}:{}={}\n",
-            parsed_flag.namespace(),
-            parsed_flag.fully_qualified_name(),
-            match parsed_flag.state() {
-                ProtoFlagState::ENABLED => "enabled",
-                ProtoFlagState::DISABLED => "disabled",
-            }
-        );
-        output.extend_from_slice(line.as_bytes());
-    }
-    Ok(output)
-}
-
-pub fn create_device_config_sysprops(mut input: Input) -> Result<Vec<u8>> {
-    let parsed_flags = input.try_parse_flags()?;
-    let mut output = Vec::new();
-    for parsed_flag in parsed_flags
-        .parsed_flag
-        .into_iter()
-        .filter(|pf| pf.permission() == ProtoFlagPermission::READ_WRITE)
-    {
-        let line = format!(
-            "persist.device_config.{}={}\n",
-            parsed_flag.fully_qualified_name(),
-            match parsed_flag.state() {
-                ProtoFlagState::ENABLED => "true",
-                ProtoFlagState::DISABLED => "false",
-            }
-        );
-        output.extend_from_slice(line.as_bytes());
-    }
-    Ok(output)
-}
-
 pub fn dump_parsed_flags(
     mut input: Vec<Input>,
     format: DumpFormat,
-    filters: &[&str],
+    filters: &[String],
     dedup: bool,
 ) -> Result<Vec<u8>> {
     let individually_parsed_flags: Result<Vec<ProtoParsedFlags>> =
@@ -611,6 +571,7 @@ mod tests {
     fn test_parse_flags_setting_default() {
         let first_flag = r#"
         package: "com.first"
+        container: "test"
         flag {
             name: "first"
             namespace: "first_ns"
@@ -624,7 +585,7 @@ mod tests {
 
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            None,
+            "test",
             declaration,
             value,
             ProtoFlagPermission::READ_ONLY,
@@ -658,7 +619,7 @@ mod tests {
 
         let error = crate::commands::parse_flags(
             "com.argument.package",
-            Some("first.container"),
+            "first.container",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -690,7 +651,7 @@ mod tests {
 
         let error = crate::commands::parse_flags(
             "com.first",
-            Some("argument.container"),
+            "argument.container",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -719,7 +680,7 @@ mod tests {
 
         let error = crate::commands::parse_flags(
             "com.first",
-            Some("com.first.container"),
+            "com.first.container",
             declaration,
             vec![],
             ProtoFlagPermission::READ_WRITE,
@@ -761,7 +722,7 @@ mod tests {
         }];
         let error = crate::commands::parse_flags(
             "com.first",
-            Some("com.first.container"),
+            "com.first.container",
             declaration,
             value,
             ProtoFlagPermission::READ_ONLY,
@@ -803,7 +764,7 @@ mod tests {
         }];
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            Some("com.first.container"),
+            "com.first.container",
             declaration,
             value,
             ProtoFlagPermission::READ_ONLY,
@@ -848,7 +809,7 @@ mod tests {
         }];
         let error = crate::commands::parse_flags(
             "com.first",
-            Some("com.first.container"),
+            "com.first.container",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -865,6 +826,7 @@ mod tests {
     fn test_parse_flags_metadata_purpose() {
         let metadata_flag = r#"
         package: "com.first"
+        container: "test"
         flag {
             name: "first"
             namespace: "first_ns"
@@ -883,7 +845,7 @@ mod tests {
 
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            None,
+            "test",
             declaration,
             value,
             ProtoFlagPermission::READ_ONLY,
@@ -901,6 +863,7 @@ mod tests {
     fn test_parse_flags_metadata_storage() {
         let metadata_flag = r#"
         package: "com.first"
+        container: "test"
         flag {
             name: "first"
             namespace: "first_ns"
@@ -918,7 +881,7 @@ mod tests {
 
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            None,
+            "test",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -950,7 +913,7 @@ mod tests {
         }];
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            None,
+            "test",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -966,6 +929,7 @@ mod tests {
         // Case 3, fixed read only flag
         let metadata_flag = r#"
         package: "com.first"
+        container: "test"
         flag {
             name: "first"
             namespace: "first_ns"
@@ -982,7 +946,7 @@ mod tests {
 
         let flags_bytes = crate::commands::parse_flags(
             "com.first",
-            None,
+            "test",
             declaration,
             value,
             ProtoFlagPermission::READ_WRITE,
@@ -998,22 +962,6 @@ mod tests {
         // TODO case 4, mainline beta namespace fixed read only flag
         // TODO case 5, mainline beta namespace platform flag
         // TODO case 6, mainline beta namespace mainline flag
-    }
-
-    #[test]
-    fn test_create_device_config_defaults() {
-        let input = parse_test_flags_as_input();
-        let bytes = create_device_config_defaults(input).unwrap();
-        let text = std::str::from_utf8(&bytes).unwrap();
-        assert_eq!("aconfig_test:com.android.aconfig.test.disabled_rw=disabled\naconfig_test:com.android.aconfig.test.disabled_rw_exported=disabled\nother_namespace:com.android.aconfig.test.disabled_rw_in_other_namespace=disabled\naconfig_test:com.android.aconfig.test.enabled_rw=enabled\n", text);
-    }
-
-    #[test]
-    fn test_create_device_config_sysprops() {
-        let input = parse_test_flags_as_input();
-        let bytes = create_device_config_sysprops(input).unwrap();
-        let text = std::str::from_utf8(&bytes).unwrap();
-        assert_eq!("persist.device_config.com.android.aconfig.test.disabled_rw=false\npersist.device_config.com.android.aconfig.test.disabled_rw_exported=false\npersist.device_config.com.android.aconfig.test.disabled_rw_in_other_namespace=false\npersist.device_config.com.android.aconfig.test.enabled_rw=true\n", text);
     }
 
     #[test]
@@ -1036,7 +984,10 @@ mod tests {
         let bytes = dump_parsed_flags(
             vec![input],
             DumpFormat::Custom("{fully_qualified_name}".to_string()),
-            &["container:system+state:ENABLED", "container:system+permission:READ_WRITE"],
+            &[
+                "container:system+state:ENABLED".to_string(),
+                "container:system+permission:READ_WRITE".to_string(),
+            ],
             false,
         )
         .unwrap();

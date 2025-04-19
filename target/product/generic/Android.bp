@@ -464,7 +464,10 @@ soong_config_module_type {
     module_type: "android_filesystem_defaults",
     config_namespace: "ANDROID",
     bool_variables: ["TARGET_ADD_ROOT_EXTRA_VENDOR_SYMLINKS"],
-    properties: ["symlinks"],
+    properties: [
+        "symlinks",
+        "file_contexts",
+    ],
 }
 
 genrule {
@@ -487,12 +490,13 @@ system_image_defaults {
     soong_config_variables: {
         TARGET_ADD_ROOT_EXTRA_VENDOR_SYMLINKS: {
             symlinks: generic_symlinks + extra_vendor_symlinks,
+            file_contexts: ":plat_and_vendor_file_contexts",
             conditions_default: {
                 symlinks: generic_symlinks,
+                file_contexts: ":plat_file_contexts",
             },
         },
     },
-    file_contexts: ":plat_and_vendor_file_contexts",
     linker_config: {
         gen_linker_config: true,
         linker_config_srcs: [":system_linker_config_json_file"],

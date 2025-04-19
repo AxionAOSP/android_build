@@ -41,8 +41,8 @@ rust_test_host {
     name: "aconfig.test",
     defaults: ["aconfig.defaults"],
     rustlibs: [
-        "libitertools",
         "libaconfig_storage_file_with_test_utils",
+        "libitertools",
     ],
     test_suites: ["general-tests"],
 }

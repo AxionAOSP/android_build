@@ -136,7 +136,7 @@ mod tests {
     use aconfig_storage_file::DEFAULT_FILE_VERSION;
 
     use super::*;
-    use crate::Input;
+    use crate::commands::Input;
 
     pub fn parse_all_test_flags() -> Vec<ProtoParsedFlags> {
         let aconfig_files = [
@@ -167,7 +167,7 @@ mod tests {
             .map(|(pkg, aconfig_file, aconfig_content, value_file, value_content)| {
                 let bytes = crate::commands::parse_flags(
                     pkg,
-                    Some("system"),
+                    "system",
                     vec![Input {
                         source: format!("tests/{}", aconfig_file).to_string(),
                         reader: Box::new(aconfig_content),
