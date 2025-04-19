@@ -42,18 +42,18 @@ fn load_finalized_flags() -> Result<FinalizedFlagMap> {
     Ok(map)
 }
 
-fn open_zero_or_more_files(files_path: &Vec<String>) -> Result<Vec<Input>> {
+fn open_zero_or_more_files(file_paths: &Vec<String>) -> Result<Vec<Input>> {
     let mut opened_files = vec![];
-    for path in files_path {
-        let file = Box::new(File::open(path)?);
+    for path in file_paths {
+        let file = Box::new(File::open(path).with_context(|| format!("Couldn't open {path}"))?);
         opened_files.push(Input { source: path.to_string(), reader: file });
     }
     Ok(opened_files)
 }
 
-fn open_single_file(file_path: &str) -> Result<Input> {
-    let file = Box::new(File::open(file_path)?);
-    Ok(Input { source: file_path.to_string(), reader: file })
+fn open_single_file(path: &str) -> Result<Input> {
+    let file = Box::new(File::open(path).with_context(|| format!("Couldn't open {path}"))?);
+    Ok(Input { source: path.to_string(), reader: file })
 }
 
 fn write_output_files_relative_to_dir(
