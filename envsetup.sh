@@ -1692,7 +1692,7 @@ function generate_host_overrides() {
 }
 
 function cpo {
-    local device="${LINEAGE_BUILD}"
+    local device="$1"
     local output_dir="out/target/product/$device"
     local base_dest_dir="$HOME/ROM"
 
@@ -1723,30 +1723,43 @@ function cpo {
 function bpx() {
     function get_devices() {
         case "$1" in
-            "6") echo "raven oriole bluejay" ;;  # Pixel 6 Series
-            "7") echo "cheetah panther lynx" ;;  # Pixel 7 Series
-            "8") echo "husky shiba akita" ;;     # Pixel 8 Series
+            "6") echo "raven oriole bluejay" ;;
+            "7") echo "cheetah panther lynx" ;;
+            "8") echo "husky shiba akita" ;;
             *) echo "oriole raven bluejay panther cheetah lynx shiba husky akita" ;;
         esac
     }
 
     local devices
     devices=$(get_devices "$1")
+    local base_dir="$HOME/ROM"
 
     for device in $devices; do
-        echo "Setting up Vanilla for $device..."
-        axion "$device" va
-        echo "Building Vanilla for $device..."
-        ax -br "$device"
-        cpo
-    done
+        local gms_zip="$base_dir/axion-*GMS-$device.zip"
+        local vanilla_zip="$base_dir/axion-*VANILLA-$device.zip"
 
-    for device in $devices; do
-        echo "Setting up GMS for $device..."
-        axion "$device" gms
-        echo "Building GMS for $device..."
-        ax -br "$device"
-        cpo
+        if ls $gms_zip &>/dev/null && ls $vanilla_zip &>/dev/null; then
+            echo "Both GMS and VANILLA builds exist for $device. Skipping..."
+            continue
+        fi
+
+        if ! ls $vanilla_zip &>/dev/null; then
+            echo "VANILLA build missing for $device. Building..."
+            axion "$device" va
+            ax -br "$device"
+            cpo "$device"
+        else
+            echo "VANILLA build already exists for $device. Skipping Vanilla..."
+        fi
+
+        if ! ls $gms_zip &>/dev/null; then
+            echo "GMS build missing for $device. Building..."
+            axion "$device" gms
+            ax -br "$device"
+            cpo "$device"
+        else
+            echo "GMS build already exists for $device. Skipping GMS..."
+        fi
     done
 }
 
