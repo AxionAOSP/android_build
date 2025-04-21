@@ -436,6 +436,7 @@ $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENGINEERING,$(if $(FPC_CO
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_ENROL_TIMEOUT,$(if $(filter 1,$(FPC_CONFIG_ENROL_TIMEOUT)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_FIDO_AUTH,$(if $(FPC_CONFIG_FIDO_AUTH),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_FIDO_AUTH_VER_GMRZ,$(if $(filter 1,$(FPC_CONFIG_FIDO_AUTH_VER_GMRZ)),true,false))
+$(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_HW_AUTH,$(if $(filter 1,$(FPC_CONFIG_HW_AUTH)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_GOOGLE_CUSTOMIZE,$(if $(filter 1,$(FPC_CONFIG_GOOGLE_CUSTOMIZE)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_GOOGLE_RELEASE,$(if $(filter 1,$(FPC_CONFIG_GOOGLE_RELEASE)),true,false))
 $(call soong_config_set_bool,fp_hal_feature,FPC_CONFIG_NAVIGATION,$(if $(FPC_CONFIG_NAVIGATION),true,false))
