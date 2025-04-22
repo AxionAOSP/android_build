@@ -177,7 +177,7 @@ PRODUCT_SYSTEM_PROPERTIES += \
 
 PRODUCT_SYSTEM_PROPERTIES += \
     dalvik.vm.useartservice=true \
-    dalvik.vm.enable_pr_dexopt=true
+    dalvik.vm.enable_pr_dexopt=false
 
 # Copy preopted files from system_b on first boot.
 PRODUCT_SYSTEM_PROPERTIES += ro.cp_system_other_odex=1
