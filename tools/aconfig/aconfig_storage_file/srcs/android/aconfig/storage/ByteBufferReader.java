@@ -31,6 +31,10 @@ public class ByteBufferReader {
         this.mByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
     }
 
+    public boolean readBoolean() {
+        return readByte() == 1;
+    }
+
     public int readByte() {
         return Byte.toUnsignedInt(mByteBuffer.get(nextGetIndex(1)));
     }

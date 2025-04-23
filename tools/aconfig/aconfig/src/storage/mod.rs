@@ -35,6 +35,7 @@ pub struct FlagPackage<'a> {
     pub package_name: &'a str,
     pub package_id: u32,
     pub fingerprint: u64,
+    pub redact_exported_reads: bool,
     pub flag_names: HashSet<&'a str>,
     pub boolean_flags: Vec<&'a ProtoParsedFlag>,
     // The index of the first boolean flag in this aconfig package among all boolean
@@ -48,6 +49,7 @@ impl<'a> FlagPackage<'a> {
             package_name,
             package_id,
             fingerprint: 0,
+            redact_exported_reads: false,
             flag_names: HashSet::new(),
             boolean_flags: vec![],
             boolean_start_index: 0,
@@ -95,6 +97,8 @@ where
             let fingerprint = compute_flags_fingerprint(&mut flag_names_vec);
             p.fingerprint = fingerprint;
         }
+
+        // TODO - b/377311211: Set redact_exported_reads if the build flag is enabled.
     }
 
     packages
@@ -133,7 +137,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use aconfig_storage_file::DEFAULT_FILE_VERSION;
 
     use super::*;
     use crate::commands::Input;
@@ -185,10 +188,11 @@ mod tests {
             .collect()
     }
 
+    // Storage file v1.
     #[test]
     fn test_flag_package() {
         let caches = parse_all_test_flags();
-        let packages = group_flags_by_package(caches.iter(), DEFAULT_FILE_VERSION);
+        let packages = group_flags_by_package(caches.iter(), 1);
 
         for pkg in packages.iter() {
             let pkg_name = pkg.package_name;
@@ -228,6 +232,7 @@ mod tests {
         assert_eq!(packages[2].fingerprint, 0);
     }
 
+    // Storage file v2.
     #[test]
     fn test_flag_package_with_fingerprint() {
         let caches = parse_all_test_flags();
