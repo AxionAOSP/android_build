@@ -16,7 +16,7 @@ rust_defaults {
         "libserde_json",
         "libtinytemplate",
     ],
-    cfgs: select(release_flag("RELEASE_ACONFIG_SUPPORT_MINOR_SDK"), {
+    features: select(release_flag("RELEASE_ACONFIG_SUPPORT_MINOR_SDK"), {
         true: ["support_minor_sdk"],
         default: [],
     }),

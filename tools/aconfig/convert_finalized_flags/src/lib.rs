@@ -92,7 +92,7 @@ impl FromStr for ApiLevel {
             return Ok(ApiLevel::from_sdk_int(float_value as u32));
         }
 
-        if cfg!(support_minor_sdk) {
+        if cfg!(feature = "support_minor_sdk") {
             match parse_full_version(s.to_string()) {
                 Ok(full_sdk_int) => Ok(ApiLevel::from_sdk_int_full(full_sdk_int)),
                 Err(e) => Err(e),
@@ -328,7 +328,7 @@ mod tests {
         assert!(map.0.get(&ApiLevel::from_sdk_int(36)).unwrap().contains(&flags[2]));
     }
 
-    #[cfg(not(support_minor_sdk))]
+    #[cfg(not(feature = "support_minor_sdk"))]
     #[test]
     fn test_read_flags_fractions_round_up() {
         let flags = create_test_flags();
@@ -364,7 +364,7 @@ mod tests {
         assert!(map.0.get(&ApiLevel::from_sdk_int(37)).unwrap().contains(&flags[2]));
     }
 
-    #[cfg(support_minor_sdk)]
+    #[cfg(feature = "support_minor_sdk")]
     #[test]
     fn test_read_flags_fractions_creates_full_sdk() {
         let flags = create_test_flags();
@@ -394,10 +394,10 @@ mod tests {
 
         // Support 35.1 and 36.0.
         assert_eq!(map.0.len(), 2);
-        assert!(!map.0.contains_key(&ApiLevel::sdk_int(36)));
-        assert!(map.0.get(&ApiLevel::sdk_int_full(3_600_001)).unwrap().contains(&flags[0]));
-        assert!(map.0.get(&ApiLevel::sdk_int(37)).unwrap().contains(&flags[1]));
-        assert!(map.0.get(&ApiLevel::sdk_int(37)).unwrap().contains(&flags[2]));
+        assert!(!map.0.contains_key(&ApiLevel::from_sdk_int(36)));
+        assert!(map.0.get(&ApiLevel::from_sdk_int_full(3_600_001)).unwrap().contains(&flags[0]));
+        assert!(map.0.get(&ApiLevel::from_sdk_int(37)).unwrap().contains(&flags[1]));
+        assert!(map.0.get(&ApiLevel::from_sdk_int(37)).unwrap().contains(&flags[2]));
     }
 
     #[test]

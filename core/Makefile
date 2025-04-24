@@ -3508,7 +3508,7 @@ $(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_label
 check-selinux-treble-labeling: $(check-selinux-treble-labeling.timestamp)
 
 ifeq ($(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING),true)
-droidcore: $(check-selinux-treble-labeling)
+droidcore: check-selinux-treble-labeling
 endif  # PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING
 
 platform-preinstalled-apps-patterns :=
