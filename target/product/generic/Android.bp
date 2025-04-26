@@ -695,7 +695,6 @@ system_image_defaults {
         "uinput", // base_system
         "uncrypt", // base_system
         "update_engine", // generic_system
-        "update_engine_sideload", // recovery
         "update_verifier", // generic_system
         "usbd", // base_system
         "vdc", // base_system

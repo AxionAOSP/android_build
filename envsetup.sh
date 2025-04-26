@@ -534,6 +534,7 @@ function _lunch_store_leftovers()
     local variant=$3
 
     local dot_leftovers="$(getoutdir)/.leftovers"
+    rm -f $dot_leftovers
     echo "$product $release $variant" > $dot_leftovers
 }
 

@@ -203,16 +203,6 @@ endif
 ifeq ($(NATIVE_COVERAGE),true)
   ifneq (,$(strip $(LOCAL_PREBUILT_COVERAGE_ARCHIVE)))
     $(eval $(call copy-one-file,$(LOCAL_PREBUILT_COVERAGE_ARCHIVE),$(intermediates)/$(LOCAL_MODULE).zip))
-    ifneq ($(LOCAL_UNINSTALLABLE_MODULE),true)
-      ifdef LOCAL_IS_HOST_MODULE
-        my_coverage_path := $($(my_prefix)OUT_COVERAGE)/$(patsubst $($(my_prefix)OUT)/%,%,$(my_module_path))
-      else
-        my_coverage_path := $(TARGET_OUT_COVERAGE)/$(patsubst $(PRODUCT_OUT)/%,%,$(my_module_path))
-      endif
-      my_coverage_path := $(my_coverage_path)/$(patsubst %.so,%,$(my_installed_module_stem)).zip
-      $(eval $(call copy-one-file,$(LOCAL_PREBUILT_COVERAGE_ARCHIVE),$(my_coverage_path)))
-      $(LOCAL_BUILT_MODULE): $(my_coverage_path)
-    endif
   else
     # Coverage information is needed when static lib is a dependency of another
     # coverage-enabled module.
