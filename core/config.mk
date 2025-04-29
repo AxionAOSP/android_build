@@ -1309,7 +1309,7 @@ BUILD_THUMBPRINT_FILE := $(PRODUCT_OUT)/build_thumbprint.txt
 ifeq ($(strip $(HAS_BUILD_NUMBER)),true)
 $(BUILD_THUMBPRINT_FILE): $(BUILD_NUMBER_FILE)
 endif
-ifneq (,$(shell mkdir -p $(PRODUCT_OUT) && echo $(BUILD_THUMBPRINT) >$(BUILD_THUMBPRINT_FILE) && grep " " $(BUILD_THUMBPRINT_FILE)))
+ifneq (,$(shell mkdir -p $(PRODUCT_OUT) && echo $(BUILD_THUMBPRINT) >$(BUILD_THUMBPRINT_FILE).tmp && (if ! cmp -s $(BUILD_THUMBPRINT_FILE).tmp $(BUILD_THUMBPRINT_FILE); then mv $(BUILD_THUMBPRINT_FILE).tmp $(BUILD_THUMBPRINT_FILE); else rm $(BUILD_THUMBPRINT_FILE).tmp; fi) && grep " " $(BUILD_THUMBPRINT_FILE)))
   $(error BUILD_THUMBPRINT cannot contain spaces: "$(file <$(BUILD_THUMBPRINT_FILE))")
 endif
 # unset it for safety.

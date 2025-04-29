@@ -89,7 +89,7 @@ class DaemonManager:
         "edit_monitor",
         self.user_name,
         "ENABLE_ANDROID_EDIT_MONITOR",
-        100,
+        0,
     ):
       logging.warning("Edit monitor is disabled, exiting...")
       return
