@@ -446,6 +446,7 @@ $(call add_json_map, PartitionVarsForSoongMigrationOnlyDoNotUse)
   $(call add_json_str, BoardVendorBootimagePartitionSize, $(BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE))
   $(call add_json_str, BoardInitBootimagePartitionSize, $(BOARD_INIT_BOOT_IMAGE_PARTITION_SIZE))
   $(call add_json_str, BoardBootHeaderVersion, $(BOARD_BOOT_HEADER_VERSION))
+  $(call add_json_str, BoardInitBootHeaderVersion, $(BOARD_INIT_BOOT_HEADER_VERSION))
   $(call add_json_str, TargetKernelPath, $(TARGET_KERNEL_PATH))
   $(call add_json_bool, BoardUsesGenericKernelImage, $(BOARD_USES_GENERIC_KERNEL_IMAGE))
   $(call add_json_str, BootSecurityPatch, $(BOOT_SECURITY_PATCH))
@@ -607,6 +608,8 @@ $(foreach suite,$(sort $(patsubst COMPATIBILITY_TESTCASES_OUT_%,%,$(filter-out C
 $(call end_json_map)
 
 $(call add_json_list, ProductHostPackages, $(PRODUCT_HOST_PACKAGES))
+
+$(call add_json_bool, ProductEnableLogcatPersistence, $(PRODUCT_ENABLE_LOGCAT_PERSISTENCE))
 
 $(call add_json_bool, EnforceSELinuxTrebleLabeling, $(filter true,$(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING)))
 

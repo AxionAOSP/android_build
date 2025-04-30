@@ -82,7 +82,7 @@ _flags_dir:=$(OUT_DIR)/soong/release-config
 _flags_file:=$(_flags_dir)/release_config-$(TARGET_PRODUCT)-$(TARGET_RELEASE).vars
 # release-config generates $(_flags_varmk)
 _flags_varmk:=$(_flags_file:.vars=.varmk)
-$(shell $(OUT_DIR)/release-config $(_args) >$(OUT_DIR)/release-config.out && touch -t 200001010000 $(_flags_varmk))
+$(shell $(OUT_DIR)/release-config $(_args) >$(OUT_DIR)/release-config.${TARGET_PRODUCT}.out && touch -t 200001010000 $(_flags_varmk))
 $(if $(filter-out 0,$(.SHELLSTATUS)),$(error release-config failed to run))
 ifneq (,$(_final_product_config_pass))
     # Save the final version of the config.

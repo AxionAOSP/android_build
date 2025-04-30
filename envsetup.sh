@@ -447,6 +447,7 @@ function _lunch_meat()
     TARGET_PRODUCT=$product \
     TARGET_RELEASE=$release \
     TARGET_BUILD_VARIANT=$variant \
+    TARGET_BUILD_APPS= \
     build_build_var_cache
     if [ $? -ne 0 ]
     then
@@ -461,6 +462,8 @@ function _lunch_meat()
     export TARGET_RELEASE=$release
     # Note this is the string "release", not the value of the variable.
     export TARGET_BUILD_TYPE=release
+    # Undo any previous tapas or banchan setup
+    export TARGET_BUILD_APPS=
 
     [[ -n "${ANDROID_QUIET_BUILD:-}" ]] || echo
 

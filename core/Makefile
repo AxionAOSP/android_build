@@ -7961,10 +7961,6 @@ $(call dist-for-goals,haiku,$(PRODUCT_OUT)/module-info.json)
 .PHONY: haiku-java
 haiku-java: $(SOONG_JAVA_FUZZ_PACKAGING_ARCH_MODULES) $(ALL_JAVA_FUZZ_TARGETS)
 $(call dist-for-goals,haiku-java,$(SOONG_JAVA_FUZZ_PACKAGING_ARCH_MODULES))
-.PHONY: haiku-rust
-haiku-rust: $(SOONG_RUST_FUZZ_PACKAGING_ARCH_MODULES) $(ALL_RUST_FUZZ_TARGETS)
-$(call dist-for-goals,haiku-rust,$(SOONG_RUST_FUZZ_PACKAGING_ARCH_MODULES))
-$(call dist-for-goals,haiku-rust,$(PRODUCT_OUT)/module-info.json)
 .PHONY: haiku-presubmit
 haiku-presubmit: $(SOONG_PRESUBMIT_FUZZ_PACKAGING_ARCH_MODULES) $(ALL_PRESUBMIT_FUZZ_TARGETS)
 $(call dist-for-goals,haiku-presubmit,$(SOONG_PRESUBMIT_FUZZ_PACKAGING_ARCH_MODULES))

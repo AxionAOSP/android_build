@@ -7,7 +7,6 @@
 
 #######################################
 include $(BUILD_SYSTEM)/base_rules.mk
-include $(BUILD_SYSTEM)/use_lld_setup.mk
 #######################################
 
 ##################################################
@@ -1629,17 +1628,13 @@ ifndef LOCAL_IS_HOST_MODULE
 my_target_global_cflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CFLAGS)
 my_target_global_conlyflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CONLYFLAGS) $(my_c_std_conlyflags)
 my_target_global_cppflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CPPFLAGS) $(my_cpp_std_cppflags)
-ifeq ($(my_use_clang_lld),true)
-  my_target_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LLDFLAGS)
-  include $(BUILD_SYSTEM)/pack_dyn_relocs_setup.mk
-  ifeq ($(my_pack_module_relocations),true)
-    my_target_global_ldflags += -Wl,--pack-dyn-relocs=android+relr -Wl,--use-android-relr-tags
-  else
-    my_target_global_ldflags += -Wl,--pack-dyn-relocs=none
-  endif
+my_target_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LDFLAGS)
+include $(BUILD_SYSTEM)/pack_dyn_relocs_setup.mk
+ifeq ($(my_pack_module_relocations),true)
+  my_target_global_ldflags += -Wl,--pack-dyn-relocs=android+relr -Wl,--use-android-relr-tags
 else
-  my_target_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LDFLAGS)
-endif # my_use_clang_lld
+  my_target_global_ldflags += -Wl,--pack-dyn-relocs=none
+endif
 
 ifeq ($(call module-in-vendor-or-product),true)
   my_target_global_c_includes :=
@@ -1684,11 +1679,7 @@ my_host_global_c_system_includes := $(SRC_SYSTEM_HEADERS) \
 my_host_global_cflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CFLAGS)
 my_host_global_conlyflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CONLYFLAGS) $(my_c_std_conlyflags)
 my_host_global_cppflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_CPPFLAGS) $(my_cpp_std_cppflags)
-ifeq ($(my_use_clang_lld),true)
-  my_host_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LLDFLAGS)
-else
-  my_host_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LDFLAGS)
-endif # my_use_clang_lld
+my_host_global_ldflags := $($(LOCAL_2ND_ARCH_VAR_PREFIX)CLANG_$(my_prefix)GLOBAL_LDFLAGS)
 
 $(LOCAL_INTERMEDIATE_TARGETS): PRIVATE_GLOBAL_C_INCLUDES := $(my_host_global_c_includes)
 $(LOCAL_INTERMEDIATE_TARGETS): PRIVATE_GLOBAL_C_SYSTEM_INCLUDES := $(my_host_global_c_system_includes)

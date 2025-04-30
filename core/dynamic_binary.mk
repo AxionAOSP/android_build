@@ -30,7 +30,6 @@ linked_module := $(intermediates)/LINKED/$(notdir $(my_installed_module_stem))
 LOCAL_INTERMEDIATE_TARGETS := $(linked_module)
 
 ###################################
-include $(BUILD_SYSTEM)/use_lld_setup.mk
 include $(BUILD_SYSTEM)/binary.mk
 ###################################
 
