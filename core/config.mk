@@ -108,6 +108,7 @@ $(KATI_obsolete_var TARGET_ROOT_OUT_SBIN_UNSTRIPPED,/sbin has been removed, use 
 $(KATI_obsolete_var BUILD_BROKEN_PHONY_TARGETS)
 $(KATI_obsolete_var BUILD_BROKEN_DUP_COPY_HEADERS)
 $(KATI_obsolete_var BUILD_BROKEN_ENG_DEBUG_TAGS)
+$(KATI_obsolete_var BUILD_BROKEN_GENRULE_SANDBOXING)
 $(KATI_obsolete_export It is a global setting. See $(CHANGES_URL)#export_keyword)
 $(KATI_obsolete_var BUILD_BROKEN_ANDROIDMK_EXPORTS)
 $(KATI_obsolete_var PRODUCT_NOTICE_SPLIT_OVERRIDE,Stop using this, keep calm, and carry on.)

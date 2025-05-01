@@ -1233,6 +1233,12 @@ endif
 
 INTERNAL_PREBUILT_BOOTIMAGE :=
 
+# Split lunches (especially the system side lunch) can have init_boot enabled without the kernel,
+# handle that case and continue to pass the OS-version/patch-level values into the init_boot.img.
+INTERNAL_MKBOOTIMG_VERSION_ARGS := \
+  --os_version $(PLATFORM_VERSION_LAST_STABLE) \
+  --os_patch_level $(PLATFORM_SECURITY_PATCH)
+
 my_installed_prebuilt_gki_apex := $(strip $(foreach package,$(PRODUCT_PACKAGES),$(if $(ALL_MODULES.$(package).EXTRACTED_BOOT_IMAGE),$(package))))
 ifdef my_installed_prebuilt_gki_apex
   ifneq (1,$(words $(my_installed_prebuilt_gki_apex))) # len(my_installed_prebuilt_gki_apex) > 1
@@ -1329,10 +1335,6 @@ else ifndef BUILDING_VENDOR_BOOT_IMAGE # && BOARD_USES_GENERIC_KERNEL_IMAGE != t
     INTERNAL_BOOTIMAGE_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
   endif
 endif # BUILDING_VENDOR_BOOT_IMAGE == "" && BOARD_USES_GENERIC_KERNEL_IMAGE != true
-
-INTERNAL_MKBOOTIMG_VERSION_ARGS := \
-  --os_version $(PLATFORM_VERSION_LAST_STABLE) \
-  --os_patch_level $(PLATFORM_SECURITY_PATCH)
 
 # Define these only if we are building boot
 ifdef BUILDING_BOOT_IMAGE
@@ -1543,8 +1545,14 @@ $(INSTALLED_INIT_BOOT_IMAGE_TARGET): $(MKBOOTIMG) $(INSTALLED_RAMDISK_TARGET)
 
 INTERNAL_INIT_BOOT_IMAGE_ARGS := --ramdisk $(INSTALLED_RAMDISK_TARGET)
 
-ifdef BOARD_KERNEL_PAGESIZE
-  INTERNAL_INIT_BOOT_IMAGE_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
+ifdef BOARD_INIT_BOOT_IMAGE_PAGESIZE
+	INTERNAL_INIT_BOOT_IMAGE_PAGESIZE := $(BOARD_INIT_BOOT_IMAGE_PAGESIZE)
+else ifdef BOARD_KERNEL_PAGESIZE
+	INTERNAL_INIT_BOOT_IMAGE_PAGESIZE := $(BOARD_KERNEL_PAGESIZE)
+endif
+
+ifdef INTERNAL_INIT_BOOT_IMAGE_PAGESIZE
+  INTERNAL_INIT_BOOT_IMAGE_ARGS += --pagesize $(INTERNAL_INIT_BOOT_IMAGE_PAGESIZE)
 endif
 
 ifeq ($(BOARD_AVB_ENABLE),true)

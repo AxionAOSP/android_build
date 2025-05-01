@@ -67,6 +67,7 @@ _board_strip_readonly_list += TARGET_ARCH_SUITE
 _board_strip_readonly_list += BOARD_FLASH_BLOCK_SIZE
 _board_strip_readonly_list += BOARD_BOOTIMAGE_PARTITION_SIZE
 _board_strip_readonly_list += BOARD_INIT_BOOT_IMAGE_PARTITION_SIZE
+_board_strip_readonly_list += BOARD_INIT_BOOT_IMAGE_PAGESIZE
 _board_strip_readonly_list += BOARD_RECOVERYIMAGE_PARTITION_SIZE
 _board_strip_readonly_list += BOARD_SYSTEMIMAGE_PARTITION_SIZE
 _board_strip_readonly_list += BOARD_SYSTEMIMAGE_FILE_SYSTEM_TYPE
@@ -186,7 +187,6 @@ _build_broken_var_list := \
   BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE \
   BUILD_BROKEN_VINTF_PRODUCT_COPY_FILES \
   BUILD_BROKEN_INCORRECT_PARTITION_IMAGES \
-  BUILD_BROKEN_GENRULE_SANDBOXING \
   BUILD_BROKEN_DONT_CHECK_SYSTEMSDK \
 
 _build_broken_var_list += \
