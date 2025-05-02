@@ -1789,6 +1789,94 @@ function initPixelRoomService() {
     fi
 }
 
+function rbr() {
+    local ROOT_DIR="$(pwd)"
+    local MANIFEST_FILE="$ROOT_DIR/android/snippets/axion.xml"
+    local TARGET_BRANCH="lineage-22.2"
+
+    if [[ ! -f "$MANIFEST_FILE" ]]; then
+        echo "[ERROR] Manifest file not found: $MANIFEST_FILE"
+        return 1
+    fi
+
+    echo "[INFO] Parsing manifest: $MANIFEST_FILE"
+
+    local -a SUCCESS_REPOS=()
+    local -a SKIPPED_REPOS=()
+    local -a FAILED_REPOS=()
+
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+
+    grep '<project ' "$MANIFEST_FILE" | \
+        grep 'remote="axion"' | \
+        sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2/p' > "$TMP_REPO_LIST"
+
+    while IFS='|' read -r REPO_PATH REPO_NAME; do
+        echo ""
+        echo "[INFO] Processing $REPO_PATH ($REPO_NAME)..."
+
+        cd "$ROOT_DIR/$REPO_PATH" 2>/dev/null || {
+            echo "[WARN] Directory $REPO_PATH not found, skipping."
+            SKIPPED_REPOS+=("$REPO_PATH")
+            continue
+        }
+
+        echo "[INFO] Fetching from LineageOS/$REPO_NAME..."
+        if ! git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" 2>/dev/null; then
+            echo "[WARN] Branch '$TARGET_BRANCH' not found in LineageOS/$REPO_NAME, skipping."
+            SKIPPED_REPOS+=("$REPO_PATH")
+            continue
+        fi
+
+        echo "[INFO] Rebasing onto LineageOS/$TARGET_BRANCH..."
+        if ! git rebase FETCH_HEAD 2>/dev/null; then
+            if git status | grep -q "You have unmerged paths"; then
+                echo "[ERROR] Rebase conflict in $REPO_PATH. Please resolve manually."
+                FAILED_REPOS+=("$REPO_PATH")
+            else
+                echo "[WARN] Rebase failed in $REPO_PATH. Aborting."
+                FAILED_REPOS+=("$REPO_PATH")
+            fi
+            git rebase --abort >/dev/null 2>&1
+            continue
+        fi
+
+        echo "[INFO] Force pushing to axion/$TARGET_BRANCH..."
+        if ! git push -f --set-upstream axion "$TARGET_BRANCH" 2>/dev/null; then
+            echo "[INFO] Repo $REPO_PATH is updated."
+            SKIPPED_REPOS+=("$REPO_PATH")
+            continue
+        fi
+
+        echo "[OK] Successfully rebased and pushed: $REPO_PATH"
+        SUCCESS_REPOS+=("$REPO_PATH")
+
+    done < "$TMP_REPO_LIST"
+
+    rm -f "$TMP_REPO_LIST"
+
+    echo ""
+    echo "[DONE] All repositories processed."
+    echo ""
+    echo "===== SUMMARY ====="
+    echo "Successful: ${#SUCCESS_REPOS[@]}"
+    echo "Failed:     ${#FAILED_REPOS[@]}"
+    echo "Skipped:    ${#SKIPPED_REPOS[@]}"
+
+    if [[ ${#FAILED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Failed Repos:"
+        printf ' - %s\n' "${FAILED_REPOS[@]}"
+    fi
+
+    if [[ ${#SKIPPED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped Repos:"
+        printf ' - %s\n' "${SKIPPED_REPOS[@]}"
+    fi
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
