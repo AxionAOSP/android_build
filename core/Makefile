@@ -2328,9 +2328,9 @@ $(if $(BOARD_AVB_ENABLE), \
   $(if $(filter $(2),system_other), \
     $(hide) echo "avb_system_other_hashtree_enable=$(BOARD_AVB_ENABLE)" >> $(1)$(newline) \
     $(hide) echo "avb_system_other_add_hashtree_footer_args=$(BOARD_AVB_SYSTEM_OTHER_ADD_HASHTREE_FOOTER_ARGS)" >> $(1)$(newline) \
-    $(if $(BOARD_AVB_SYSTEM_OTHER_KEY_PATH),\
-      $(hide) echo "avb_system_other_key_path=$(BOARD_AVB_SYSTEM_OTHER_KEY_PATH)" >> $(1)$(newline) \
-      $(hide) echo "avb_system_other_algorithm=$(BOARD_AVB_SYSTEM_OTHER_ALGORITHM)" >> $(1)$(newline))) \
+    $(if $(BOARD_AVB_SYSTEM_KEY_PATH),\
+      $(hide) echo "avb_system_other_key_path=$(BOARD_AVB_SYSTEM_KEY_PATH)" >> $(1)$(newline) \
+      $(hide) echo "avb_system_other_algorithm=$(BOARD_AVB_SYSTEM_ALGORITHM)" >> $(1)$(newline))) \
   $(if $(filter $(2),vendor), \
     $(hide) echo "avb_vendor_hashtree_enable=$(BOARD_AVB_ENABLE)" >> $(1)$(newline) \
     $(hide) echo "avb_vendor_add_hashtree_footer_args=$(BOARD_AVB_VENDOR_ADD_HASHTREE_FOOTER_ARGS)" >> $(1)$(newline) \
@@ -7235,6 +7235,9 @@ $(foreach suite,$(ALL_COMPATIBILITY_SUITES),$(eval $(call create-suite-symbols-m
 # a stack trace frame.
 #
 
+# The symbols.zip for unbundled builds is built with soong
+ifeq (,$(TARGET_BUILD_UNBUNDLED))
+
 name := $(TARGET_PRODUCT)
 ifeq ($(TARGET_BUILD_TYPE),debug)
   name := $(name)_debug
@@ -7246,12 +7249,7 @@ SYMBOLS_ZIP := $(PRODUCT_OUT)/$(name)-symbols.zip
 SYMBOLS_MAPPING := $(PRODUCT_OUT)/$(name)-symbols-mapping.textproto
 .KATI_READONLY := SYMBOLS_ZIP SYMBOLS_MAPPING
 
-ifeq (,$(TARGET_BUILD_UNBUNDLED))
-  _symbols_zip_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
-  $(SYMBOLS_ZIP): $(updater_dep)
-else
-  _symbols_zip_modules := $(unbundled_build_modules)
-endif
+_symbols_zip_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
 
 _symbols_zip_modules_symbols_files := $(foreach m,$(_symbols_zip_modules),$(ALL_MODULES.$(m).SYMBOLIC_OUTPUT_PATH))
 _symbols_zip_modules_mapping_files := $(foreach m,$(_symbols_zip_modules),$(ALL_MODULES.$(m).ELF_SYMBOL_MAPPING_PATH))
@@ -7270,12 +7268,12 @@ $(SYMBOLS_ZIP): $(SOONG_ZIP) $(SYMBOLS_MAP) $(_symbols_zip_modules_symbols_files
 $(SYMBOLS_ZIP): .KATI_IMPLICIT_OUTPUTS := $(SYMBOLS_MAPPING)
 
 $(call declare-1p-container,$(SYMBOLS_ZIP),)
-ifeq (,$(TARGET_BUILD_UNBUNDLED))
-$(call declare-container-license-deps,$(SYMBOLS_ZIP),$(PRIVATE_SYMBOLS_MODULES_FILES) $(updater_dep),$(PRODUCT_OUT)/:/)
-endif
+$(call declare-container-license-deps,$(SYMBOLS_ZIP),$(PRIVATE_SYMBOLS_MODULES_FILES),$(PRODUCT_OUT)/:/)
 
 _symbols_zip_modules_symbols_files :=
 _symbols_zip_modules_mapping_files :=
+
+endif # ifeq (,$(TARGET_BUILD_UNBUNDLED))
 
 ifeq (true,$(EMMA_INSTRUMENT))
 #------------------------------------------------------------------

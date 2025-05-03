@@ -387,6 +387,11 @@ ifneq ($(RELEASE_MOVE_VCN_TO_MAINLINE),true)
         framework-connectivity-b
 endif
 
+ifeq ($(RELEASE_TELEPHONY_MODULE),true)
+    PRODUCT_PACKAGES += \
+       com.android.telephony
+endif
+
 ifneq (,$(RELEASE_RANGING_STACK))
     PRODUCT_PACKAGES += \
         com.android.ranging

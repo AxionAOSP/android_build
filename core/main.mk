@@ -1496,13 +1496,7 @@ else ifneq ($(TARGET_BUILD_APPS),)
   $(call dist-for-goals-with-filenametag,apps_only, $(PROGUARD_USAGE_ZIP))
   $(call declare-container-license-deps,$(PROGUARD_USAGE_ZIP),$(apps_only_installed_files),$(PRODUCT_OUT)/:/)
 
-  $(SYMBOLS_ZIP) : $(apps_only_installed_files)
-  $(call dist-for-goals-with-filenametag,apps_only, $(SYMBOLS_ZIP) $(SYMBOLS_MAPPING))
-  $(call declare-container-license-deps,$(SYMBOLS_ZIP),$(apps_only_installed_files),$(PRODUCT_OUT)/:/)
-
-  $(COVERAGE_ZIP) : $(apps_only_installed_files)
-  $(call dist-for-goals,apps_only, $(COVERAGE_ZIP))
-  $(call declare-container-license-deps,$(COVERAGE_ZIP),$(apps_only_installed_files),$(PRODUCT_OUT)/:/)
+  # some more files are disted in soong's unbundled_builder module
 
 apps_only: $(unbundled_build_modules)
 
@@ -1557,7 +1551,6 @@ else ifeq ($(TARGET_BUILD_UNBUNDLED),$(TARGET_BUILD_UNBUNDLED_IMAGE))
 
   $(call dist-for-goals, droidcore-unbundled, \
     $(INTERNAL_OTA_METADATA) \
-    $(COVERAGE_ZIP) \
     $(INSTALLED_FILES_FILE) \
     $(INSTALLED_FILES_JSON) \
     $(INSTALLED_FILES_FILE_VENDOR) \
