@@ -28,4 +28,4 @@ serde_json = "1.0.93"
 convert_finalized_flags = { path = "../convert_finalized_flags" }
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(enable_fingerprint_rust)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(enable_fingerprint_rust)', 'cfg(enable_fingerprint_cpp)'] }

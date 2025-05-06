@@ -31,6 +31,10 @@ namespace {cpp_namespace} \{
         std::unique_ptr<aconfig_storage::MappedStorageFile> flag_value_file_;
 
         bool package_exists_in_storage_;
+
+        {{ if use_package_fingerprint- }}
+        bool fingerprint_matches_;
+        {{ -endif }}{#- end of use_package_fingerprint #}
     {{ -endif }}
 
     public:
@@ -39,7 +43,12 @@ namespace {cpp_namespace} \{
             : overrides_()
             , boolean_start_index_()
             , flag_value_file_(nullptr)
+            {{ if use_package_fingerprint- }}
+            , package_exists_in_storage_(true)
+            , fingerprint_matches_(true) \{
+            {{ -else }}
             , package_exists_in_storage_(true) \{
+            {{ -endif }}{#- end of use_package_fingerprint #}
 
             auto package_map_file = aconfig_storage::get_mapped_file(
                  "{container}",
@@ -64,6 +73,14 @@ namespace {cpp_namespace} \{
                 package_exists_in_storage_ = false;
                 return;
             }
+            {{ if use_package_fingerprint- }}
+
+                if (context->fingerprint != { package_fingerprint }ULL) \{
+                    ALOGE("Fingerprint mismatch for package {package}.");
+                    fingerprint_matches_ = false;
+                    return;
+                }
+            {{ -endif }}{#- end of use_package_fingerprint #}
 
             // cache package boolean flag start index
             boolean_start_index_ = context->boolean_start_index;
@@ -99,8 +116,16 @@ namespace {cpp_namespace} \{
             } else \{
                 {{ if item.readwrite- }}
                 if (!package_exists_in_storage_) \{
+                    ALOGE("error: package does not exist, returning flag default value.");
                     return {item.default_value};
                 }
+                {{ if use_package_fingerprint- }}
+
+                if (!fingerprint_matches_) \{
+                    ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                    return {item.default_value};
+                }
+                {{ -endif }}{#- end of use_package_fingerprint #}
 
                 auto value = aconfig_storage::get_boolean_flag_value(
                     *flag_value_file_,
@@ -138,7 +163,12 @@ namespace {cpp_namespace} \{
             : cache_({readwrite_count})
             , boolean_start_index_()
             , flag_value_file_(nullptr)
+            {{ if use_package_fingerprint- }}
+            , package_exists_in_storage_(true)
+            , fingerprint_matches_(true) \{
+            {{ -else }}
             , package_exists_in_storage_(true) \{
+            {{ -endif }}{#- end of use_package_fingerprint #}
             for (size_t i = 0 ; i < {readwrite_count}; i++) \{
                 cache_[i] = -1;
             }
@@ -164,6 +194,14 @@ namespace {cpp_namespace} \{
                 package_exists_in_storage_ = false;
                 return;
             }
+            {{ if use_package_fingerprint- }}
+
+                if (context->fingerprint != { package_fingerprint }ULL) \{
+                    ALOGE("Fingerprint mismatch for package {package}.");
+                    fingerprint_matches_ = false;
+                    return;
+                }
+            {{ -endif }}{#- end of use_package_fingerprint #}
 
             // cache package boolean flag start index
             boolean_start_index_ = context->boolean_start_index;
@@ -192,8 +230,16 @@ namespace {cpp_namespace} \{
             {{ -if item.readwrite }}
             if (cache_[{item.readwrite_idx}].load(std::memory_order_relaxed) == -1) \{
                 if (!package_exists_in_storage_) \{
+                    ALOGE("error: package does not exist, returning flag default value.");
                     return {item.default_value};
                 }
+                {{ if use_package_fingerprint- }}
+
+                if (!fingerprint_matches_) \{
+                    ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                    return {item.default_value};
+                }
+                {{ -endif }}{#- end of use_package_fingerprint #}
 
                 auto value = aconfig_storage::get_boolean_flag_value(
                     *flag_value_file_,
@@ -226,6 +272,10 @@ namespace {cpp_namespace} \{
         std::unique_ptr<aconfig_storage::MappedStorageFile> flag_value_file_;
 
         bool package_exists_in_storage_;
+        {{ if use_package_fingerprint- }}
+
+        bool fingerprint_matches_;
+        {{ -endif }}{#- end of use_package_fingerprint #}
     {{ -endif }}
 
     };

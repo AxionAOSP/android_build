@@ -32,6 +32,7 @@ pub fn generate_cpp_code<I>(
     parsed_flags_iter: I,
     codegen_mode: CodegenMode,
     flag_ids: HashMap<String, u16>,
+    package_fingerprint: Option<u64>,
 ) -> Result<Vec<OutputFile>>
 where
     I: Iterator<Item = ProtoParsedFlag>,
@@ -48,6 +49,7 @@ where
     ensure!(class_elements.len() > 0);
     let container = class_elements[0].container.clone();
     ensure!(codegen::is_valid_name_ident(&header));
+    let use_package_fingerprint = package_fingerprint.is_some();
     let context = Context {
         header: &header,
         package_macro: &package_macro,
@@ -59,6 +61,8 @@ where
         is_test_mode: codegen_mode == CodegenMode::Test,
         class_elements,
         container,
+        use_package_fingerprint,
+        package_fingerprint: package_fingerprint.unwrap_or_default(),
     };
 
     let files = [
@@ -103,6 +107,8 @@ pub struct Context<'a> {
     pub is_test_mode: bool,
     pub class_elements: Vec<ClassElement>,
     pub container: String,
+    pub use_package_fingerprint: bool,
+    pub package_fingerprint: u64,
 }
 
 #[derive(Serialize)]
@@ -608,6 +614,7 @@ namespace com::android::aconfig::test {
             virtual bool disabled_rw() override {
                 if (cache_[0].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -628,6 +635,7 @@ namespace com::android::aconfig::test {
             virtual bool disabled_rw_exported() override {
                 if (cache_[1].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -648,6 +656,7 @@ namespace com::android::aconfig::test {
             virtual bool disabled_rw_in_other_namespace() override {
                 if (cache_[2].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -684,6 +693,7 @@ namespace com::android::aconfig::test {
             virtual bool enabled_rw() override {
                 if (cache_[3].load(std::memory_order_relaxed) == -1) {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return true;
                     }
 
@@ -709,6 +719,264 @@ namespace com::android::aconfig::test {
         std::unique_ptr<aconfig_storage::MappedStorageFile> flag_value_file_;
 
         bool package_exists_in_storage_;
+
+    };
+
+    std::unique_ptr<flag_provider_interface> provider_ =
+        std::make_unique<flag_provider>();
+}
+
+bool com_android_aconfig_test_disabled_ro() {
+    return false;
+}
+
+bool com_android_aconfig_test_disabled_rw() {
+    return com::android::aconfig::test::disabled_rw();
+}
+
+bool com_android_aconfig_test_disabled_rw_exported() {
+    return com::android::aconfig::test::disabled_rw_exported();
+}
+
+bool com_android_aconfig_test_disabled_rw_in_other_namespace() {
+    return com::android::aconfig::test::disabled_rw_in_other_namespace();
+}
+
+bool com_android_aconfig_test_enabled_fixed_ro() {
+    return COM_ANDROID_ACONFIG_TEST_ENABLED_FIXED_RO;
+}
+
+bool com_android_aconfig_test_enabled_fixed_ro_exported() {
+    return COM_ANDROID_ACONFIG_TEST_ENABLED_FIXED_RO_EXPORTED;
+}
+
+bool com_android_aconfig_test_enabled_ro() {
+    return true;
+}
+
+bool com_android_aconfig_test_enabled_ro_exported() {
+    return true;
+}
+
+bool com_android_aconfig_test_enabled_rw() {
+    return com::android::aconfig::test::enabled_rw();
+}
+
+"#;
+
+    const PROD_SOURCE_FILE_EXPECTED_WITH_FINGERPRINT: &str = r#"
+#include "com_android_aconfig_test.h"
+
+#include <unistd.h>
+#include "aconfig_storage/aconfig_storage_read_api.hpp"
+#include <android/log.h>
+#define LOG_TAG "aconfig_cpp_codegen"
+#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#include <atomic>
+#include <vector>
+
+namespace com::android::aconfig::test {
+
+    class flag_provider : public flag_provider_interface {
+        public:
+
+            flag_provider()
+                : cache_(4)
+                , boolean_start_index_()
+                , flag_value_file_(nullptr)
+                , package_exists_in_storage_(true)
+                , fingerprint_matches_(true) {
+                for (size_t i = 0 ; i < 4; i++) {
+                    cache_[i] = -1;
+                }
+
+                auto package_map_file = aconfig_storage::get_mapped_file(
+                    "system",
+                    aconfig_storage::StorageFileType::package_map);
+                if (!package_map_file.ok()) {
+                    ALOGE("error: failed to get package map file: %s", package_map_file.error().c_str());
+                    package_exists_in_storage_ = false;
+                    return;
+                }
+
+                auto context = aconfig_storage::get_package_read_context(
+                    **package_map_file, "com.android.aconfig.test");
+                if (!context.ok()) {
+                    ALOGE("error: failed to get package read context: %s", context.error().c_str());
+                    package_exists_in_storage_ = false;
+                    return;
+                }
+
+                if (!(context->package_exists)) {
+                    package_exists_in_storage_ = false;
+                    return;
+                }
+
+                if (context->fingerprint != 5801144784618221668ULL) {
+                    ALOGE("Fingerprint mismatch for package com.android.aconfig.test.");
+                    fingerprint_matches_ = false;
+                    return;
+                }
+
+                // cache package boolean flag start index
+                boolean_start_index_ = context->boolean_start_index;
+
+                // unmap package map file and free memory
+                delete *package_map_file;
+
+                auto flag_value_file = aconfig_storage::get_mapped_file(
+                    "system",
+                    aconfig_storage::StorageFileType::flag_val);
+                if (!flag_value_file.ok()) {
+                    ALOGE("error: failed to get flag value file: %s", flag_value_file.error().c_str());
+                    package_exists_in_storage_ = false;
+                    return;
+                }
+
+                // cache flag value file
+                flag_value_file_ = std::unique_ptr<aconfig_storage::MappedStorageFile>(
+                    *flag_value_file);
+
+            }
+
+
+            virtual bool disabled_ro() override {
+                return false;
+            }
+
+            virtual bool disabled_rw() override {
+                if (cache_[0].load(std::memory_order_relaxed) == -1) {
+                    if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
+                        return false;
+                    }
+
+                    if (!fingerprint_matches_) {
+                        ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                        return false;
+                    }
+
+                    auto value = aconfig_storage::get_boolean_flag_value(
+                        *flag_value_file_,
+                        boolean_start_index_ + 0);
+
+                    if (!value.ok()) {
+                        ALOGE("error: failed to read flag value: %s", value.error().c_str());
+                        return false;
+                    }
+
+                    cache_[0].store(*value, std::memory_order_relaxed);
+                }
+                return cache_[0].load(std::memory_order_relaxed);
+            }
+
+            virtual bool disabled_rw_exported() override {
+                if (cache_[1].load(std::memory_order_relaxed) == -1) {
+                    if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
+                        return false;
+                    }
+
+
+                    if (!fingerprint_matches_) {
+                      ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                      return false;
+                    }
+
+                    auto value = aconfig_storage::get_boolean_flag_value(
+                        *flag_value_file_,
+                        boolean_start_index_ + 1);
+
+                    if (!value.ok()) {
+                        ALOGE("error: failed to read flag value: %s", value.error().c_str());
+                        return false;
+                    }
+
+                    cache_[1].store(*value, std::memory_order_relaxed);
+                }
+                return cache_[1].load(std::memory_order_relaxed);
+            }
+
+            virtual bool disabled_rw_in_other_namespace() override {
+                if (cache_[2].load(std::memory_order_relaxed) == -1) {
+                    if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
+                        return false;
+                    }
+
+
+                    if (!fingerprint_matches_) {
+                      ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                      return false;
+                    }
+
+                    auto value = aconfig_storage::get_boolean_flag_value(
+                        *flag_value_file_,
+                        boolean_start_index_ + 2);
+
+                    if (!value.ok()) {
+                        ALOGE("error: failed to read flag value: %s", value.error().c_str());
+                        return false;
+                    }
+
+                    cache_[2].store(*value, std::memory_order_relaxed);
+                }
+                return cache_[2].load(std::memory_order_relaxed);
+            }
+
+            virtual bool enabled_fixed_ro() override {
+                return COM_ANDROID_ACONFIG_TEST_ENABLED_FIXED_RO;
+            }
+
+            virtual bool enabled_fixed_ro_exported() override {
+                return COM_ANDROID_ACONFIG_TEST_ENABLED_FIXED_RO_EXPORTED;
+            }
+
+            virtual bool enabled_ro() override {
+                return true;
+            }
+
+            virtual bool enabled_ro_exported() override {
+                return true;
+            }
+
+            virtual bool enabled_rw() override {
+                if (cache_[3].load(std::memory_order_relaxed) == -1) {
+                    if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
+                        return true;
+                    }
+
+
+                    if (!fingerprint_matches_) {
+                      ALOGE("error: package fingerprint mismtach, returning flag default value.");
+                      return true;
+                    }
+
+                    auto value = aconfig_storage::get_boolean_flag_value(
+                        *flag_value_file_,
+                        boolean_start_index_ + 7);
+
+                    if (!value.ok()) {
+                        ALOGE("error: failed to read flag value: %s", value.error().c_str());
+                        return true;
+                    }
+
+                    cache_[3].store(*value, std::memory_order_relaxed);
+                }
+                return cache_[3].load(std::memory_order_relaxed);
+            }
+
+    private:
+        std::vector<std::atomic_int8_t> cache_;
+
+        uint32_t boolean_start_index_;
+
+        std::unique_ptr<aconfig_storage::MappedStorageFile> flag_value_file_;
+
+        bool package_exists_in_storage_;
+
+        bool fingerprint_matches_;
     };
 
     std::unique_ptr<flag_provider_interface> provider_ =
@@ -848,6 +1116,7 @@ namespace com::android::aconfig::test {
                       return it->second;
                 } else {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -874,6 +1143,7 @@ namespace com::android::aconfig::test {
                       return it->second;
                 } else {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -900,6 +1170,7 @@ namespace com::android::aconfig::test {
                       return it->second;
                 } else {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return false;
                     }
 
@@ -978,6 +1249,7 @@ namespace com::android::aconfig::test {
                       return it->second;
                 } else {
                     if (!package_exists_in_storage_) {
+                        ALOGE("error: package does not exist, returning flag default value.");
                         return true;
                     }
 
@@ -1279,16 +1551,19 @@ bool com_android_aconfig_test_enabled_ro() {
         mode: CodegenMode,
         expected_header: &str,
         expected_src: &str,
+        with_fingerprint: bool,
     ) {
         let modified_parsed_flags =
             crate::commands::modify_parsed_flags_based_on_mode(parsed_flags, mode).unwrap();
         let flag_ids =
             assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
+        let package_fingerprint = if with_fingerprint { Some(5801144784618221668) } else { None };
         let generated = generate_cpp_code(
             crate::test::TEST_PACKAGE,
             modified_parsed_flags.into_iter(),
             mode,
             flag_ids,
+            package_fingerprint,
         )
         .unwrap();
         let mut generated_files_map = HashMap::new();
@@ -1311,12 +1586,9 @@ bool com_android_aconfig_test_enabled_ro() {
 
         target_file_path = String::from("com_android_aconfig_test.cc");
         assert!(generated_files_map.contains_key(&target_file_path));
-        assert_eq!(
-            None,
-            crate::test::first_significant_code_diff(
-                expected_src,
-                generated_files_map.get(&target_file_path).unwrap()
-            )
+        crate::test::assert_no_significant_code_diff(
+            expected_src,
+            generated_files_map.get(&target_file_path).unwrap(),
         );
     }
 
@@ -1328,6 +1600,19 @@ bool com_android_aconfig_test_enabled_ro() {
             CodegenMode::Production,
             EXPORTED_PROD_HEADER_EXPECTED,
             PROD_SOURCE_FILE_EXPECTED,
+            false,
+        );
+    }
+
+    #[test]
+    fn test_generate_cpp_code_for_prod_with_fingerprint() {
+        let parsed_flags = crate::test::parse_test_flags();
+        test_generate_cpp_code(
+            parsed_flags,
+            CodegenMode::Production,
+            EXPORTED_PROD_HEADER_EXPECTED,
+            PROD_SOURCE_FILE_EXPECTED_WITH_FINGERPRINT,
+            true,
         );
     }
 
@@ -1339,6 +1624,7 @@ bool com_android_aconfig_test_enabled_ro() {
             CodegenMode::Test,
             EXPORTED_TEST_HEADER_EXPECTED,
             TEST_SOURCE_FILE_EXPECTED,
+            false,
         );
     }
 
@@ -1350,6 +1636,7 @@ bool com_android_aconfig_test_enabled_ro() {
             CodegenMode::ForceReadOnly,
             EXPORTED_FORCE_READ_ONLY_HEADER_EXPECTED,
             FORCE_READ_ONLY_SOURCE_FILE_EXPECTED,
+            false,
         );
     }
 
@@ -1361,6 +1648,7 @@ bool com_android_aconfig_test_enabled_ro() {
             CodegenMode::Production,
             READ_ONLY_EXPORTED_PROD_HEADER_EXPECTED,
             READ_ONLY_PROD_SOURCE_FILE_EXPECTED,
+            false,
         );
     }
 }

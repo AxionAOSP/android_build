@@ -276,6 +276,7 @@ parsed_flag {
             }],
             crate::commands::DEFAULT_FLAG_PERMISSION,
             true,
+            None,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()
@@ -301,6 +302,7 @@ parsed_flag {
             ],
             crate::commands::DEFAULT_FLAG_PERMISSION,
             true,
+            None,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()
@@ -320,6 +322,7 @@ parsed_flag {
             }],
             crate::commands::DEFAULT_FLAG_PERMISSION,
             true,
+            None,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()

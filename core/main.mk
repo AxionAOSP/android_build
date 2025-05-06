@@ -1480,6 +1480,14 @@ else ifneq ($(TARGET_BUILD_APPS),)
     $(call dist-for-goals,apps_only, $(JACOCO_REPORT_CLASSES_ALL))
   endif
 
+  $(PROGUARD_DICT_ZIP) : $(apps_only_installed_files)
+  $(call dist-for-goals-with-filenametag,apps_only, $(PROGUARD_DICT_ZIP) $(PROGUARD_DICT_ZIP) $(PROGUARD_DICT_MAPPING))
+  $(call declare-container-license-deps,$(PROGUARD_DICT_ZIP),$(apps_only_installed_files),$(PRODUCT_OUT)/:/)
+
+  $(PROGUARD_USAGE_ZIP) : $(apps_only_installed_files)
+  $(call dist-for-goals-with-filenametag,apps_only, $(PROGUARD_USAGE_ZIP))
+  $(call declare-container-license-deps,$(PROGUARD_USAGE_ZIP),$(apps_only_installed_files),$(PRODUCT_OUT)/:/)
+
   # some more files are disted in soong's unbundled_builder module
 
 apps_only: $(unbundled_build_modules)

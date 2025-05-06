@@ -113,6 +113,7 @@ fn main() -> Result<()> {
             default_permission,
             allow_read_write,
             cache_out_path,
+            mainline_beta_namespace_config,
         } => {
             let output = commands::parse_flags(
                 &package,
@@ -121,6 +122,7 @@ fn main() -> Result<()> {
                 open_zero_or_more_files(&values)?,       // values
                 default_permission,
                 allow_read_write,
+                mainline_beta_namespace_config,
             )
             .context("failed to create cache")?;
             write_output_to_file_or_stdout(&cache_out_path, &output)?;

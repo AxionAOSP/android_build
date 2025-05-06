@@ -91,6 +91,24 @@ Allow the same flag to be present in multiple cache files; if duplicates are fou
 a single instance.
 "#;
 
+const MAINLINE_BETA_NAMESPACE_CONFIG: &str = r#"
+A json file to configure mainline beta namespaces. This option is internal to Google. The json
+configuration should assume the following format:
+
+{
+    "namespaces": {
+        "com_android_tethering": {
+            "container": "com.android.tethering",
+            "allow_exported": true
+        },
+        "com_android_mediaprovider": {
+            "container": "com.android.mediaprovider",
+            "allow_exported": true
+        }
+    }
+}
+"#;
+
 /// Conventional prefix to mark response file
 pub const RESPONSE_FILE_PREFIX: char = '@';
 
@@ -111,6 +129,7 @@ pub enum ParsedCommand {
         default_permission: aconfig_protos::ProtoFlagPermission,
         allow_read_write: bool,
         cache_out_path: String,
+        mainline_beta_namespace_config: Option<PathBuf>,
     },
     CreateJavaLib {
         cache_path: String,
@@ -168,8 +187,11 @@ fn build_cli() -> Command {
                         .value_parser(clap::value_parser!(bool))
                         .default_value("true"),
                 )
+                .arg(Arg::new("cache").long("cache").required(true).help("Output cache file path."))
                 .arg(
-                    Arg::new("cache").long("cache").required(true).help("Output cache file path."),
+                    Arg::new("mainline-beta-namespace-config")
+                        .long("mainline-beta-namespace-config")
+                        .long_help(MAINLINE_BETA_NAMESPACE_CONFIG.trim()),
                 ),
         )
         .subcommand(
@@ -339,6 +361,17 @@ pub fn parse_args(
         Some(("create-cache", sub_matches)) => {
             let declarations = get_zero_or_more_string_paths_from_arg(sub_matches, "declarations");
             let values = get_zero_or_more_string_paths_from_arg(sub_matches, "values");
+            let mainline_beta_namespace_config =
+                match sub_matches.get_one::<String>("mainline-beta-namespace-config") {
+                    Some(config) => {
+                        if config.is_empty() {
+                            None
+                        } else {
+                            Some(PathBuf::from(config))
+                        }
+                    }
+                    None => None,
+                };
             Ok(ParsedCommand::CreateCache {
                 package: get_required_arg::<String>(sub_matches, "package")?.clone(),
                 container: get_required_arg::<String>(sub_matches, "container")?.clone(),
@@ -350,6 +383,7 @@ pub fn parse_args(
                 )?,
                 allow_read_write: *get_required_arg::<bool>(sub_matches, "allow-read-write")?,
                 cache_out_path: get_required_arg::<String>(sub_matches, "cache")?.clone(),
+                mainline_beta_namespace_config,
             })
         }
         Some(("create-java-lib", sub_matches)) => Ok(ParsedCommand::CreateJavaLib {
@@ -452,7 +486,8 @@ mod tests {
              --values flag.val \
              --cache /output/cache.pb \
              --default-permission READ_WRITE \
-             --allow-read-write true";
+             --allow-read-write true \
+             --mainline-beta-namespace-config /path/to/some/file.json";
         let input_args = create_os_command(command_string);
         let parsed = parse_args(input_args)?;
 
@@ -465,6 +500,7 @@ mod tests {
             default_permission,
             allow_read_write,
             cache_out_path,
+            mainline_beta_namespace_config,
         } = parsed
         {
             assert_eq!(package, "com.test.cache");
@@ -476,6 +512,10 @@ mod tests {
             assert_eq!(default_permission, aconfig_protos::ProtoFlagPermission::READ_WRITE);
             assert!(allow_read_write);
             assert_eq!(cache_out_path, "/output/cache.pb");
+            assert_eq!(
+                mainline_beta_namespace_config,
+                Some(PathBuf::from("/path/to/some/file.json"))
+            );
         }
         Ok(())
     }
@@ -661,6 +701,7 @@ mod tests {
             cache_out_path,
             default_permission,
             allow_read_write,
+            mainline_beta_namespace_config,
         } = parsed
         {
             assert_eq!(package, "com.via.respfile");
@@ -672,6 +713,7 @@ mod tests {
             assert_eq!(default_permission, aconfig_protos::ProtoFlagPermission::READ_WRITE);
             assert!(allow_read_write);
             assert_eq!(cache_out_path, "cache.pb");
+            assert_eq!(mainline_beta_namespace_config, None);
         }
 
         Ok(())
@@ -687,7 +729,7 @@ mod tests {
             --cache \
             cache.pb \
             --declarations  test.aconfig \
-             --values flag.val";
+            --values flag.val";
         let mut reader = MockFileReader::default();
         reader.add_file("response", file_content);
         let mut input_args: Vec<OsString> =
@@ -705,6 +747,7 @@ mod tests {
             cache_out_path,
             default_permission,
             allow_read_write,
+            mainline_beta_namespace_config,
         } = parsed
         {
             assert_eq!(package, "com.via.respfile");
@@ -716,6 +759,7 @@ mod tests {
             assert_eq!(default_permission, aconfig_protos::ProtoFlagPermission::READ_WRITE);
             assert!(allow_read_write);
             assert_eq!(cache_out_path, "cache.pb");
+            assert_eq!(mainline_beta_namespace_config, None);
         }
 
         Ok(())
