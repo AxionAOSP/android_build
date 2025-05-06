@@ -227,9 +227,3 @@ $(LOCAL_INSTALLED_MODULE): PRIVATE_POST_INSTALL_CMD := \
 endif
 
 $(LOCAL_BUILT_MODULE): $(LOCAL_ADDITIONAL_DEPENDENCIES)
-
-# Reinstall shared library dependencies of fuzz targets to /data/fuzz/ (for
-# target) or /data/ (for host).
-ifdef LOCAL_IS_FUZZ_TARGET
-$(LOCAL_INSTALLED_MODULE): $(LOCAL_FUZZ_INSTALLED_SHARED_DEPS)
-endif
