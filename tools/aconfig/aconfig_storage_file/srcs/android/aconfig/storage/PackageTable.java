@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@android.ravenwood.annotation.RavenwoodKeepWholeClass
 public class PackageTable {
 
     private static final int FINGERPRINT_BYTES = 8;

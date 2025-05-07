@@ -164,6 +164,9 @@ java_library {
     srcs: [
         "srcs/**/*.java",
     ],
+    libs: [
+        "ravenwood-annotations-lib",
+    ],
     sdk_version: "core_current",
     min_sdk_version: "29",
     host_supported: true,
@@ -178,6 +181,9 @@ java_library {
     name: "aconfig_storage_file_java_none",
     srcs: [
         "srcs/**/*.java",
+    ],
+    libs: [
+        "ravenwood-annotations-lib",
     ],
     sdk_version: "none",
     system_modules: "core-all-system-modules",

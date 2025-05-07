@@ -7318,14 +7318,12 @@ endif # EMMA_INSTRUMENT=true
 # finding the appropriate dictionary to deobfuscate a stack trace frame.
 #
 
+# The proguard zips for unbundled builds are built with soong
 ifeq (,$(TARGET_BUILD_UNBUNDLED))
-  _proguard_dict_zip_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
-else
-  _proguard_dict_zip_modules := $(unbundled_build_modules)
-endif
+
+_proguard_dict_zip_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
 
 # Filter out list to avoid uncessary proguard related file generation
-ifeq (,$(TARGET_BUILD_UNBUNDLED))
 filter_out_proguard_dict_zip_modules :=
 # product.img
 ifndef BUILDING_PRODUCT_IMAGE
@@ -7388,7 +7386,6 @@ endef
 
 # Filter out proguard dict zip modules those are not installed at the built image
 _proguard_dict_zip_modules := $(foreach m,$(_proguard_dict_zip_modules),$(strip $(call filter-out-proguard-modules,$(m))))
-endif
 
 # The path to the zip file containing proguard dictionaries.
 PROGUARD_DICT_ZIP :=$= $(PRODUCT_OUT)/$(TARGET_PRODUCT)-proguard-dict.zip
@@ -7451,6 +7448,8 @@ $(call declare-container-license-deps,$(PROGUARD_USAGE_ZIP),$(INSTALLED_SYSTEMIM
     $(INSTALLED_SYSTEM_DLKMIMAGE_TARGET) \
     $(updater_dep),$(PROGUARD_USAGE_ZIP):/)
 endif
+
+endif # ifeq (,$(TARGET_BUILD_UNBUNDLED))
 
 ifeq (true,$(PRODUCT_USE_DYNAMIC_PARTITIONS))
 

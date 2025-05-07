@@ -30,6 +30,3 @@ PRODUCT_PACKAGES += \
     StorageManager \
     SystemUI \
     WallpaperCropper \
-
-# Allowlist for system packages included in handheld_system_ext.mk
-PRODUCT_PACKAGES += preinstalled_packages_handheld_system_ext.xml
