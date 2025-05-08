@@ -304,6 +304,7 @@ pub fn create_java_lib(
         package_fingerprint,
         single_exported_file,
         finalized_flags,
+        support_uau_annotation: !cfg!(enable_jarjar_flags_in_framwork),
     };
     generate_java_code(&package, modified_parsed_flags.into_iter(), config)
 }

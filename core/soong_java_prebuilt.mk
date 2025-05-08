@@ -42,10 +42,10 @@ endif
 $(eval $(call copy-one-file,$(LOCAL_PREBUILT_MODULE_FILE),$(LOCAL_BUILT_MODULE)))
 
 ifdef LOCAL_SOONG_JACOCO_REPORT_CLASSES_JAR
-  $(eval $(call copy-one-file,$(LOCAL_SOONG_JACOCO_REPORT_CLASSES_JAR),\
-    $(call local-packaging-dir,jacoco)/jacoco-report-classes.jar))
-  $(call add-dependency,$(common_javalib.jar),\
-    $(call local-packaging-dir,jacoco)/jacoco-report-classes.jar)
+  ALL_MODULES.$(my_register_name).JACOCO_REPORT_FILES := $(LOCAL_SOONG_JACOCO_REPORT_CLASSES_JAR)
+  ALL_MODULES.$(my_register_name).JACOCO_REPORT_SOONG_ZIP_ARGUMENTS := \
+    -e out/target/common/obj/$(LOCAL_MODULE_CLASS)/$(LOCAL_MODULE)_intermediates/jacoco-report-classes.jar \
+    -f $(LOCAL_SOONG_JACOCO_REPORT_CLASSES_JAR)
 endif
 
 ifdef LOCAL_SOONG_PROGUARD_DICT

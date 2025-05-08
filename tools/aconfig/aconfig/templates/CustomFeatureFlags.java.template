@@ -1,8 +1,10 @@
 package {package_name};
 
 {{ if not library_exported- }}
+{{ if support_uau_annotation- }}
 // TODO(b/303773055): Remove the annotation after access issue is resolved.
 import android.compat.annotation.UnsupportedAppUsage;
+{{ -endif }}
 {{ -endif }}
 import java.util.Arrays;
 {{ -if library_exported }}
@@ -35,7 +37,11 @@ public class CustomFeatureFlags implements FeatureFlags \{
 
 {{ -for item in flag_elements}}
     @Override
-{{ if not library_exported }}    @UnsupportedAppUsage{{ -endif }}
+{{ if not library_exported- }}
+{{ if support_uau_annotation- }}
+    @UnsupportedAppUsage
+{{ -endif }}
+{{ -endif }}
     public boolean {item.method_name}() \{
         return getValue(Flags.FLAG_{item.flag_name_constant_suffix},
             FeatureFlags::{item.method_name});

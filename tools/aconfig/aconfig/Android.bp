@@ -30,6 +30,10 @@ rust_defaults {
         select(release_flag("RELEASE_ACONFIG_FINGERPRINT_CPP"), {
             true: ["enable_fingerprint_cpp"],
             default: [],
+        }) +
+        select(release_flag("RELEASE_JARJAR_FLAGS_IN_FRAMEWORK"), {
+            true: ["enable_jarjar_flags_in_framwork"],
+            default: [],
         }),
 }
 
@@ -50,8 +54,8 @@ rust_test_host {
     ],
     test_suites: ["general-tests"],
     data: [
-        "tests/mainline_beta_namespaces.json"
-    ]
+        "tests/mainline_beta_namespaces.json",
+    ],
 }
 
 // integration tests: general

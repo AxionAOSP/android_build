@@ -383,7 +383,7 @@ class Runner():
         # Preroll builds
         if not self._options.ApplyOnly():
             for i in range(benchmark.preroll):
-                ns = self._run_build(lunch, benchmark_log_dir.joinpath(f"pre_{i}"), benchmark)
+                ns = self._run_build(lunch, benchmark_log_dir.joinpath(f"pre_{i}"), benchmark, {})
                 report.preroll_duration_ns.append(ns)
 
         sys.stderr.write(f"PERFORMING CHANGE: {benchmark.change.label}\n")
@@ -394,8 +394,11 @@ class Runner():
                 return
         try:
 
+            extra_env = {
+                    "SOONG_HONOR_USE_PARTIAL_COMPILE": "true",
+            }
             # Measured build
-            ns = self._run_build(lunch, benchmark_log_dir.joinpath("measured"), benchmark)
+            ns = self._run_build(lunch, benchmark_log_dir.joinpath("measured"), benchmark, extra_env)
             report.duration_ns = ns
 
             dist_one = self._options.DistOne()
@@ -407,7 +410,7 @@ class Runner():
                 # Postroll builds
                 for i in range(benchmark.postroll):
                     ns = self._run_build(lunch, benchmark_log_dir.joinpath(f"post_{i}"),
-                                         benchmark)
+                                         benchmark, {})
                     report.postroll_duration_ns.append(ns)
 
         finally:
@@ -426,7 +429,7 @@ class Runner():
         path += ("/%0" + str(len(str(self._options.Iterations()))) + "d") % iteration
         return path
 
-    def _run_build(self, lunch, build_log_dir, benchmark):
+    def _run_build(self, lunch, build_log_dir, benchmark, extra_env):
         """Builds the modules.  Saves interesting log files to log_dir.  Raises FatalError
         if the build fails.
         """
@@ -441,6 +444,8 @@ class Runner():
             env["TARGET_PRODUCT"] = lunch.target_product
             env["TARGET_RELEASE"] = lunch.target_release
             env["TARGET_BUILD_VARIANT"] = lunch.target_build_variant
+            for k, v in extra_env.items():
+              env[k] = v
             returncode = subprocess.call(cmd, env=env)
             if returncode != 0:
                 report_error(f"Build failed: {' '.join(cmd)}")

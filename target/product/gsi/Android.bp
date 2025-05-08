@@ -102,6 +102,9 @@ android_filesystem_defaults {
         "StorageManager",
         "SystemUI",
 
+        // Allowlist for handheld packages
+        "preinstalled_packages_handheld_system_ext.xml",
+
         // telephony packages
         "CarrierConfig",
 

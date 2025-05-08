@@ -7282,22 +7282,10 @@ ifeq (true,$(EMMA_INSTRUMENT))
 # to be instrumented.
 # Any dependencies are set up later in build/make/core/main.mk.
 
-JACOCO_REPORT_CLASSES_ALL := $(PRODUCT_OUT)/jacoco-report-classes-all.jar
-$(JACOCO_REPORT_CLASSES_ALL): PRIVATE_TARGET_JACOCO_DIR := $(call intermediates-dir-for,PACKAGING,jacoco)
-$(JACOCO_REPORT_CLASSES_ALL): PRIVATE_HOST_JACOCO_DIR := $(call intermediates-dir-for,PACKAGING,jacoco,HOST)
-$(JACOCO_REPORT_CLASSES_ALL): PRIVATE_TARGET_PROGUARD_USAGE_DIR := $(call intermediates-dir-for,PACKAGING,proguard_usage)
-$(JACOCO_REPORT_CLASSES_ALL): PRIVATE_HOST_PROGUARD_USAGE_DIR := $(call intermediates-dir-for,PACKAGING,proguard_usage,HOST)
-$(JACOCO_REPORT_CLASSES_ALL) :
-	@echo "Collecting uninstrumented classes"
-	mkdir -p $(PRIVATE_TARGET_JACOCO_DIR) $(PRIVATE_HOST_JACOCO_DIR) $(PRIVATE_TARGET_PROGUARD_USAGE_DIR) $(PRIVATE_HOST_PROGUARD_USAGE_DIR)
-	$(SOONG_ZIP) -o $@ -L 0 \
-	  -C $(PRIVATE_TARGET_JACOCO_DIR) -P out/target/common/obj -D $(PRIVATE_TARGET_JACOCO_DIR) \
-	  -C $(PRIVATE_HOST_JACOCO_DIR) -P out/target/common/obj -D $(PRIVATE_HOST_JACOCO_DIR) \
-	  -C $(PRIVATE_TARGET_PROGUARD_USAGE_DIR) -P out/target/common/obj -D $(PRIVATE_TARGET_PROGUARD_USAGE_DIR) \
-	  -C $(PRIVATE_HOST_PROGUARD_USAGE_DIR) -P out/target/common/obj -D $(PRIVATE_HOST_PROGUARD_USAGE_DIR)
-
 ifeq (,$(TARGET_BUILD_UNBUNDLED))
-  $(JACOCO_REPORT_CLASSES_ALL): $(INTERNAL_ALLIMAGES_FILES)
+  _jacoco_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
+else
+  _jacoco_modules := $(unbundled_build_modules)
 endif
 
 # This is not ideal, but it is difficult to correctly figure out the actual jacoco report
@@ -7305,8 +7293,20 @@ endif
 # the env variable is set and this should guarantee thaat all the jacoco report jars are ready
 # when we package the final report jar here.
 ifeq ($(JACOCO_PACKAGING_INCLUDE_DEVICE_TESTS),true)
-  $(JACOCO_REPORT_CLASSES_ALL): $(COMPATIBILITY.device-tests.FILES)
+  _jacoco_modules += $(COMPATIBILITY.device-tests.MODULES)
 endif
+
+JACOCO_REPORT_CLASSES_ALL := $(PRODUCT_OUT)/jacoco-report-classes-all.jar
+$(JACOCO_REPORT_CLASSES_ALL): PRIVATE_SOONG_ZIP_ARGUMENTS := $(foreach m,$(_jacoco_modules),$(ALL_MODULES.$(m).JACOCO_REPORT_SOONG_ZIP_ARGUMENTS))
+$(JACOCO_REPORT_CLASSES_ALL): $(SOONG_ZIP) $(foreach m,$(_jacoco_modules),$(ALL_MODULES.$(m).JACOCO_REPORT_FILES))
+	@echo "Collecting uninstrumented classes"
+	rm -f $@.tmparglist && touch $@.tmparglist
+	$(foreach arg,$(PRIVATE_SOONG_ZIP_ARGUMENTS),printf "%s\n" "$(arg)" >> $@.tmparglist$(newline))
+	$(SOONG_ZIP) -o $@ -L 0 @$@.tmparglist
+	rm -f $@.tmparglist
+
+_jacoco_modules :=
+
 endif # EMMA_INSTRUMENT=true
 
 
