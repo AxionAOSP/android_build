@@ -133,12 +133,12 @@ endif
 my_tidy_checks := $(subst $(space),,$(my_tidy_checks))
 
 # Configure the pool to use for clang rules.
-# If LOCAL_CC or LOCAL_CXX is set don't use goma or RBE.
+# If LOCAL_CC or LOCAL_CXX is set don't RBE.
 # If clang-tidy is being used, don't use the RBE pool (as clang-tidy runs in
 # the same action, and is not remoted)
 my_pool :=
 ifeq (,$(strip $(my_cc))$(strip $(my_cxx))$(strip $(my_tidy_checks)))
-  my_pool := $(GOMA_OR_RBE_POOL)
+  my_pool := $(RBE_POOL)
 endif
 
 ifneq (,$(strip $(foreach dir,$(NATIVE_COVERAGE_PATHS),$(filter $(dir)%,$(LOCAL_PATH)))))

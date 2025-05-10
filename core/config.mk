@@ -1164,20 +1164,14 @@ define find_warning_allowed_projects
     $(filter $(ANDROID_WARNING_ALLOWED_PROJECTS),$(1)/)
 endef
 
-GOMA_POOL :=
 RBE_POOL :=
-GOMA_OR_RBE_POOL :=
-# When goma or RBE are enabled, kati will be passed --default_pool=local_pool to put
+# When RBE is enabled, kati will be passed --default_pool=local_pool to put
 # most rules into the local pool.  Explicitly set the pool to "none" for rules that
 # should be run outside the local pool, i.e. with -j500.
-ifneq (,$(filter-out false,$(USE_GOMA)))
-  GOMA_POOL := none
-  GOMA_OR_RBE_POOL := none
-else ifneq (,$(filter-out false,$(USE_RBE)))
+ifneq (,$(filter-out false,$(USE_RBE)))
   RBE_POOL := none
-  GOMA_OR_RBE_POOL := none
 endif
-.KATI_READONLY := GOMA_POOL RBE_POOL GOMA_OR_RBE_POOL
+.KATI_READONLY := RBE_POOL
 
 JAVAC_NINJA_POOL :=
 R8_NINJA_POOL :=
