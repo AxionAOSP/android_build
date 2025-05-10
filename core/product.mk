@@ -418,6 +418,9 @@ _product_single_value_vars += PRODUCT_CGROUP_V2_SYS_APP_ISOLATION_ENABLED
 # If set, check treble labeling
 _product_single_value_vars += PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING
 
+# Path to a tracking list file for treble labeling
+_product_single_value_vars += PRODUCT_SELINUX_TREBLE_LABELING_TRACKING_LIST_FILE
+
 # List of .json files to be merged/compiled into vendor/etc/linker.config.pb and product/etc/linker.config.pb
 _product_list_vars += PRODUCT_VENDOR_LINKER_CONFIG_FRAGMENTS
 _product_list_vars += PRODUCT_PRODUCT_LINKER_CONFIG_FRAGMENTS

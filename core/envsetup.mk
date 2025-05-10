@@ -336,9 +336,9 @@ $(eval _dump_variables_rbc_excluded := \
   TOPDIR \
   TRACE_BEGIN_SOONG \
   USER)
-$(file >$(OUT_DIR)/dump-variables-rbc-temp.txt,$(subst $(space),$(newline),$(sort $(filter-out $(_dump_variables_rbc_excluded),$(.VARIABLES)))))
+$(file >$(OUT_DIR)/dump-variables-rbc-temp-$(TARGET_PRODUCT).txt,$(subst $(space),$(newline),$(sort $(filter-out $(_dump_variables_rbc_excluded),$(.VARIABLES)))))
 $(file >$(1),\
-$(foreach v, $(shell grep -he "^[A-Z][A-Z0-9_]*$$" $(OUT_DIR)/dump-variables-rbc-temp.txt),\
+$(foreach v, $(shell grep -he "^[A-Z][A-Z0-9_]*$$" $(OUT_DIR)/dump-variables-rbc-temp-$(TARGET_PRODUCT).txt),\
 $(v) := $(strip $($(v)))$(newline))\
 $(foreach ns,$(sort $(SOONG_CONFIG_NAMESPACES)),\
 $(foreach v,$(sort $(SOONG_CONFIG_$(ns))),\

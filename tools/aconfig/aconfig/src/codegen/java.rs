@@ -252,10 +252,7 @@ fn format_property_name(property_name: &str) -> String {
     format!("mProperties{}{}", &name[0..1].to_ascii_uppercase(), &name[1..])
 }
 
-fn add_feature_flags_impl_template(
-    context: &Context,
-    template: &mut TinyTemplate,
-) -> Result<(), tinytemplate::error::Error> {
+fn add_feature_flags_impl_template(context: &Context, template: &mut TinyTemplate) -> Result<()> {
     if context.is_test_mode {
         // Test mode has its own template, so use regardless of any other settings.
         template.add_template(
@@ -268,18 +265,32 @@ fn add_feature_flags_impl_template(
     match context.library_exported {
         // Exported library with new_exported enabled, use new storage exported template.
         true => {
+            ensure!(
+                !context.use_device_config,
+                "using device config in exported mode is currently not supported"
+            );
             template.add_template(
                 "FeatureFlagsImpl.java",
                 include_str!("../../templates/FeatureFlagsImpl.exported.java.template"),
             )?;
         }
         // New storage internal mode.
-        false => {
-            template.add_template(
-                "FeatureFlagsImpl.java",
-                include_str!("../../templates/FeatureFlagsImpl.new_storage.java.template"),
-            )?;
-        }
+        false => match context.use_device_config {
+            true => {
+                template.add_template(
+                    "FeatureFlagsImpl.java",
+                    include_str!(
+                        "../../templates/FeatureFlagsImpl.legacy_flag.internal.java.template"
+                    ),
+                )?;
+            }
+            false => {
+                template.add_template(
+                    "FeatureFlagsImpl.java",
+                    include_str!("../../templates/FeatureFlagsImpl.new_storage.java.template"),
+                )?;
+            }
+        },
     };
     Ok(())
 }
@@ -548,34 +559,7 @@ mod tests {
     }
     "#;
 
-    #[test]
-    fn test_generate_java_code_production() {
-        let parsed_flags = crate::test::parse_test_flags();
-        let mode = CodegenMode::Production;
-        let modified_parsed_flags =
-            crate::commands::modify_parsed_flags_based_on_mode(parsed_flags, mode).unwrap();
-        let flag_ids =
-            assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
-        let config = JavaCodegenConfig {
-            codegen_mode: mode,
-            flag_ids,
-            package_fingerprint: 5801144784618221668,
-            single_exported_file: false,
-            finalized_flags: FinalizedFlagMap::new(),
-            support_uau_annotation: false,
-        };
-        let generated_files = generate_java_code(
-            crate::test::TEST_PACKAGE,
-            modified_parsed_flags.into_iter(),
-            config,
-        )
-        .unwrap();
-        let expect_flags_content = EXPECTED_FLAG_COMMON_CONTENT.to_string()
-            + r#"
-            private static FeatureFlags FEATURE_FLAGS = new FeatureFlagsImpl();
-        }"#;
-
-        let expected_featureflagsmpl_content = r#"
+    const EXPECTED_NEW_STORAGE_FEATUREFLAGSIMPL_CONTENT: &str = r#"
         package com.android.aconfig.test;
         import android.os.flagging.PlatformAconfigPackageInternal;
         import android.util.Log;
@@ -662,11 +646,150 @@ mod tests {
                 return enabledRw;
             }
         }
-        "#;
+    "#;
+
+    const EXPECTED_MAINLINE_BETA_FEATUREFLAGSIMPL_CONTENT: &str = r#"
+        package com.android.aconfig.test;
+        import android.provider.DeviceConfig;
+        /** @hide */
+        public final class FeatureFlagsImpl implements FeatureFlags {
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean disabledRo() {
+                return false;
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean disabledRw() {
+                try {
+                    return DeviceConfig.getBoolean(
+                    "aconfig_test",
+                    Flags.FLAG_DISABLED_RW,
+                    false);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException(
+                        "Cannot read value from namespace aconfig_test "
+                        + "from DeviceConfig. It could be that the code using flag "
+                        + "executed before SettingsProvider initialization. Please use "
+                        + "fixed read-only flag by adding is_fixed_read_only: true in "
+                        + "flag declaration.",
+                        e
+                    );
+                }
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean disabledRwExported() {
+                try {
+                    return DeviceConfig.getBoolean(
+                    "aconfig_test",
+                    Flags.FLAG_DISABLED_RW_EXPORTED,
+                    false);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException(
+                        "Cannot read value from namespace aconfig_test "
+                        + "from DeviceConfig. It could be that the code using flag "
+                        + "executed before SettingsProvider initialization. Please use "
+                        + "fixed read-only flag by adding is_fixed_read_only: true in "
+                        + "flag declaration.",
+                        e
+                    );
+                }
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean disabledRwInOtherNamespace() {
+                try {
+                    return DeviceConfig.getBoolean(
+                    "other_namespace",
+                    Flags.FLAG_DISABLED_RW_IN_OTHER_NAMESPACE,
+                    false);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException(
+                        "Cannot read value from namespace other_namespace "
+                        + "from DeviceConfig. It could be that the code using flag "
+                        + "executed before SettingsProvider initialization. Please use "
+                        + "fixed read-only flag by adding is_fixed_read_only: true in "
+                        + "flag declaration.",
+                        e
+                    );
+                }
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean enabledFixedRo() {
+                return true;
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean enabledFixedRoExported() {
+                return true;
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean enabledRo() {
+                return true;
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean enabledRoExported() {
+                return true;
+            }
+            @Override
+            @com.android.aconfig.annotations.AconfigFlagAccessor
+            public boolean enabledRw() {
+                try {
+                    return DeviceConfig.getBoolean(
+                    "aconfig_test",
+                    Flags.FLAG_ENABLED_RW,
+                    true);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException(
+                        "Cannot read value from namespace aconfig_test "
+                        + "from DeviceConfig. It could be that the code using flag "
+                        + "executed before SettingsProvider initialization. Please use "
+                        + "fixed read-only flag by adding is_fixed_read_only: true in "
+                        + "flag declaration.",
+                        e
+                    );
+                }
+            }
+        }
+    "#;
+
+    #[test]
+    fn test_generate_java_code_production() {
+        let parsed_flags = crate::test::parse_test_flags();
+        let mode = CodegenMode::Production;
+        let modified_parsed_flags =
+            crate::commands::modify_parsed_flags_based_on_mode(parsed_flags, mode).unwrap();
+        let flag_ids =
+            assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
+        let config = JavaCodegenConfig {
+            codegen_mode: mode,
+            flag_ids,
+            package_fingerprint: 5801144784618221668,
+            single_exported_file: false,
+            finalized_flags: FinalizedFlagMap::new(),
+            support_uau_annotation: false,
+        };
+        let generated_files = generate_java_code(
+            crate::test::TEST_PACKAGE,
+            modified_parsed_flags.into_iter(),
+            config,
+        )
+        .unwrap();
+        let expect_flags_content = EXPECTED_FLAG_COMMON_CONTENT.to_string()
+            + r#"
+            private static FeatureFlags FEATURE_FLAGS = new FeatureFlagsImpl();
+        }"#;
 
         let mut file_set = HashMap::from([
             ("com/android/aconfig/test/Flags.java", expect_flags_content.as_str()),
-            ("com/android/aconfig/test/FeatureFlagsImpl.java", expected_featureflagsmpl_content),
+            (
+                "com/android/aconfig/test/FeatureFlagsImpl.java",
+                EXPECTED_NEW_STORAGE_FEATUREFLAGSIMPL_CONTENT,
+            ),
             ("com/android/aconfig/test/FeatureFlags.java", EXPECTED_FEATUREFLAGS_COMMON_CONTENT),
             (
                 "com/android/aconfig/test/CustomFeatureFlags.java",
@@ -689,6 +812,73 @@ mod tests {
                 ),
                 "File {} content is not correct",
                 file_path
+            );
+            file_set.remove(file_path);
+        }
+
+        assert!(file_set.is_empty());
+    }
+
+    #[test]
+    fn test_generate_java_code_mainline_beta_production() {
+        let parsed_flags = crate::test::parse_test_flags();
+        let mode = CodegenMode::Production;
+        let modified_parsed_flags: Vec<_> =
+            crate::commands::modify_parsed_flags_based_on_mode(parsed_flags, mode)
+                .unwrap()
+                .into_iter()
+                .map(|mut pf| {
+                    if pf.metadata.storage() == ProtoFlagStorageBackend::ACONFIGD {
+                        let m = pf.metadata.as_mut().unwrap();
+                        m.set_storage(ProtoFlagStorageBackend::DEVICE_CONFIG);
+                    }
+                    pf
+                })
+                .collect();
+        let flag_ids =
+            assign_flag_ids(crate::test::TEST_PACKAGE, modified_parsed_flags.iter()).unwrap();
+        let config = JavaCodegenConfig {
+            codegen_mode: mode,
+            flag_ids,
+            package_fingerprint: 5801144784618221668,
+            single_exported_file: false,
+            finalized_flags: FinalizedFlagMap::new(),
+            support_uau_annotation: false,
+        };
+        let generated_files = generate_java_code(
+            crate::test::TEST_PACKAGE,
+            modified_parsed_flags.into_iter(),
+            config,
+        )
+        .unwrap();
+        let expect_flags_content = EXPECTED_FLAG_COMMON_CONTENT.to_string()
+            + r#"
+            private static FeatureFlags FEATURE_FLAGS = new FeatureFlagsImpl();
+        }"#;
+
+        let mut file_set = HashMap::from([
+            ("com/android/aconfig/test/Flags.java", expect_flags_content.as_str()),
+            (
+                "com/android/aconfig/test/FeatureFlagsImpl.java",
+                EXPECTED_MAINLINE_BETA_FEATUREFLAGSIMPL_CONTENT,
+            ),
+            ("com/android/aconfig/test/FeatureFlags.java", EXPECTED_FEATUREFLAGS_COMMON_CONTENT),
+            (
+                "com/android/aconfig/test/CustomFeatureFlags.java",
+                EXPECTED_CUSTOMFEATUREFLAGS_CONTENT,
+            ),
+            (
+                "com/android/aconfig/test/FakeFeatureFlagsImpl.java",
+                EXPECTED_FAKEFEATUREFLAGSIMPL_CONTENT,
+            ),
+        ]);
+
+        for file in generated_files {
+            let file_path = file.path.to_str().unwrap();
+            assert!(file_set.contains_key(file_path), "Cannot find {}", file_path);
+            crate::test::assert_no_significant_code_diff(
+                file_set.get(file_path).unwrap(),
+                &String::from_utf8(file.contents).unwrap(),
             );
             file_set.remove(file_path);
         }

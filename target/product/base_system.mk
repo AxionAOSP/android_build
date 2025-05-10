@@ -570,6 +570,11 @@ ifeq ($(PRODUCT_ENABLE_LOGCAT_PERSISTENCE),true)
         logpersist.start
 endif
 
+ifeq ($(RELEASE_LOGCAT_ENABLE_PRUNE_ON_START),true)
+    # The property determines whether logcat file pruning is performed at system boot.
+    PRODUCT_PRODUCT_PROPERTIES += ro.logcat.prune_old_log_files_on_start=true
+endif
+
 # The set of packages whose code can be loaded by the system server.
 PRODUCT_SYSTEM_SERVER_APPS += \
     SettingsProvider \
