@@ -270,6 +270,9 @@ include_makefiles_total := $(words int $(subdir_makefiles))
 
 $(foreach mk,$(subdir_makefiles),$(info [$(call inc_and_print,include_makefiles_inc)/$(include_makefiles_total)] including $(mk) ...)$(eval include $(mk)))
 
+# Unfortunately build/tasks is included at a wrong time and the order is important (b/417070498)
+-include device/generic/goldfish/build/tasks.workaround/emu_img_zip.mk
+
 # Build bootloader.img/radio.img, and unpack the partitions.
 -include vendor/google_devices/$(TARGET_SOC)/prebuilts/misc_bins/update_bootloader_radio_image.mk
 
@@ -555,7 +558,7 @@ $(foreach m,$(ALL_MODULES), \
   $(if $(r), \
     $(eval r := $(call module-installed-files,$(r))) \
     $(eval t_m := $(filter $(TARGET_OUT_ROOT)/%, $(ALL_MODULES.$(m).INSTALLED))) \
-    $(eval t_m := $(filter-out $(ALL_MODULES.$(m).ORDERONLY_INSTALLED), $(ALL_MODULES.$(m).INSTALLED))) \
+    $(eval t_m := $(filter-out $(ALL_MODULES.$(m).ORDERONLY_INSTALLED) $(ALL_MODULES.$(m).HOST_INSTALLED), $(ALL_MODULES.$(m).INSTALLED))) \
     $(eval t_r := $(filter $(TARGET_OUT_ROOT)/%, $(r))) \
     $(eval t_r := $(filter-out $(t_m), $(t_r))) \
     $(if $(t_m), $(eval $(call add-required-deps, $(t_m),$(t_r)))) \
