@@ -33,7 +33,7 @@ use crate::codegen::CodegenMode;
 use crate::dump::{DumpFormat, DumpPredicate};
 use crate::storage::generate_storage_file;
 use aconfig_protos::{
-    ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend,
+    ParsedFlagExt, ProtoFlagMetadata, ProtoFlagPermission, ProtoFlagState, ProtoFlagStorageBackend,
     ProtoParsedFlag, ProtoParsedFlags, ProtoTracepoint,
 };
 use aconfig_storage_file::sip_hasher13::SipHasher13;
@@ -89,6 +89,10 @@ pub struct MainlineBetaNamespaces {
 
 #[allow(dead_code)]
 impl MainlineBetaNamespaces {
+    fn has_flag(&self, pf: &ProtoParsedFlag) -> bool {
+        self.namespaces.contains_key(pf.namespace())
+    }
+
     fn is_mainline_beta_flag(&self, pf: &ProtoParsedFlag) -> bool {
         match self.namespaces.get(pf.namespace()) {
             Some(setting) => setting.container == pf.container(),
@@ -104,7 +108,9 @@ impl MainlineBetaNamespaces {
                 setting.container == pf.container()
                     || PLATFORM_CONTAINERS.iter().any(|&c| c == pf.container())
             }
-            None => true, // we do not enforce this for flags in non mainline beta namespaces
+            None => panic!(
+                "Should not check container support for flags in non mainline beta namespaces"
+            ),
         }
     }
 
@@ -114,12 +120,10 @@ impl MainlineBetaNamespaces {
                 if setting.container == pf.container() {
                     setting.allow_exported
                 } else {
-                    panic!("Should not be called on none mainline beta flag")
+                    panic!("Should not check exported mode support on none mainline beta flag")
                 }
             }
-            None => {
-                panic!("Should not be called on none mainline beta flag")
-            }
+            None => panic!("Should not check exported mode support on none mainline beta flag"),
         }
     }
 }
@@ -150,12 +154,23 @@ fn verify_mainline_beta_namespace_flag(
     beta_namespaces: &Option<MainlineBetaNamespaces>,
 ) -> Result<()> {
     if let Some(namespaces) = beta_namespaces {
+        if !namespaces.has_flag(pf) {
+            return Ok(());
+        }
         ensure!(
             namespaces.supports_container(pf),
             "Creating {} container flag in namespace {} is not allowed",
             pf.container(),
             pf.namespace()
         );
+        if pf.is_exported() {
+            ensure!(
+                namespaces.supports_exported_mode(pf),
+                "Creating exported flag {} in namespace {} is not allowed",
+                pf.fully_qualified_name(),
+                pf.namespace()
+            );
+        }
     }
     Ok(())
 }
@@ -986,7 +1001,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_flags_metadata_storage() {
+    fn test_parse_flags_mainline_beta_namespace_config() {
         let metadata_flag = r#"
         package: "com.first"
         container: "test"
@@ -1140,6 +1155,31 @@ mod tests {
         assert_eq!(
             format!("{:?}", error),
             "Creating com.android.tethering container flag in namespace com_android_networkstack is not allowed"
+        );
+
+        // Case 9, mainline beta namespace unsupported exported mode
+        let metadata_flag = r#"
+        package: "com.first"
+        container: "com.android.networkstack"
+        flag {
+            name: "first"
+            namespace: "com_android_networkstack"
+            description: "This is the description of this feature flag."
+            bug: "123"
+            is_exported: true
+        }
+        "#;
+        let error = get_parsed_flag_proto(
+            "com.android.networkstack",
+            "com.first",
+            metadata_flag,
+            None,
+            config.clone(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            format!("{:?}", error),
+            "Creating exported flag com.first.first in namespace com_android_networkstack is not allowed"
         );
     }
 

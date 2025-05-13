@@ -906,11 +906,6 @@ system_image_defaults {
                     "com.android.uprobestats", // base_system (RELEASE_UPROBESTATS_MODULE)
                 ],
                 default: [],
-            }) + select(release_flag("RELEASE_TELEPHONY_MODULE"), {
-                true: [
-                    "com.android.telephony", // base_system (RELEASE_TELEPHONY_MODULE)
-                ],
-                default: [],
             }),
         },
         prefer32: {

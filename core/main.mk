@@ -558,7 +558,7 @@ $(foreach m,$(ALL_MODULES), \
   $(if $(r), \
     $(eval r := $(call module-installed-files,$(r))) \
     $(eval t_m := $(filter $(TARGET_OUT_ROOT)/%, $(ALL_MODULES.$(m).INSTALLED))) \
-    $(eval t_m := $(filter-out $(ALL_MODULES.$(m).ORDERONLY_INSTALLED) $(ALL_MODULES.$(m).HOST_INSTALLED), $(ALL_MODULES.$(m).INSTALLED))) \
+    $(eval t_m := $(filter-out $(ALL_MODULES.$(m).ORDERONLY_INSTALLED), $(ALL_MODULES.$(m).INSTALLED))) \
     $(eval t_r := $(filter $(TARGET_OUT_ROOT)/%, $(r))) \
     $(eval t_r := $(filter-out $(t_m), $(t_r))) \
     $(if $(t_m), $(eval $(call add-required-deps, $(t_m),$(t_r)))) \

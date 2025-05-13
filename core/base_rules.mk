@@ -505,8 +505,12 @@ my_path_comp :=
 
 my_installed_symlinks :=
 
-ifeq (,$(LOCAL_SOONG_INSTALLED_MODULE))
-ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
+ifneq (,$(LOCAL_SOONG_INSTALLED_MODULE))
+  # Soong already generated the copy rule, but make the installed location depend on the Make
+  # copy of the intermediates for now, as some rules that collect intermediates may expect
+  # them to exist.
+  $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
+else ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
   $(LOCAL_INSTALLED_MODULE): PRIVATE_POST_INSTALL_CMD := $(LOCAL_POST_INSTALL_CMD)
   $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
 	@echo "Install: $@"
@@ -526,7 +530,6 @@ ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
   $(my_all_targets) : | $(my_installed_symlinks)
 
 endif # !LOCAL_UNINSTALLABLE_MODULE
-endif # !LOCAL_SOONG_INSTALLED_MODULE
 
 # Add dependencies on LOCAL_SOONG_INSTALL_SYMLINKS if we're installing any kind of module, not just
 # ones that set LOCAL_SOONG_INSTALLED_MODULE. This is so we can have a soong module that only
@@ -998,14 +1001,6 @@ ifneq (,$(LOCAL_SOONG_INSTALLED_MODULE))
       $(my_init_rc_installed) \
       $(my_installed_test_data) \
       $(my_vintf_installed))
-
-  ifneq (,$(LOCAL_IS_HOST_MODULE))
-    ALL_MODULES.$(my_register_name).HOST_INSTALLED := \
-    $(strip $(ALL_MODULES.$(my_register_name).HOST_INSTALLED) \
-      $(foreach f, $(LOCAL_SOONG_INSTALL_PAIRS),\
-        $(word 2,$(subst :,$(space),$(f)))) \
-      $(LOCAL_SOONG_INSTALL_SYMLINKS))
-  endif
 
   ALL_MODULES.$(my_register_name).INSTALLED_SYMLINKS := $(LOCAL_SOONG_INSTALL_SYMLINKS)
 
