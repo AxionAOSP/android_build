@@ -602,8 +602,6 @@ $(call end_json_map)
 
 $(call add_json_list, ProductHostPackages, $(PRODUCT_HOST_PACKAGES))
 
-$(call add_json_bool, ProductEnableLogcatPersistence, $(PRODUCT_ENABLE_LOGCAT_PERSISTENCE))
-
 $(call add_json_bool, EnforceSELinuxTrebleLabeling, $(filter true,$(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING)))
 
 $(call add_json_str, SELinuxTrebleLabelingTrackingListFile, $(filter true,$(PRODUCT_SELINUX_TREBLE_LABELING_TRACKING_LIST_FILE)))

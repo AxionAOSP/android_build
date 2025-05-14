@@ -554,22 +554,6 @@ PRODUCT_PACKAGES_DEBUG := \
     unwind_reg_info \
     unwind_symbols \
 
-# Enable logcat persistence based on the release config flag.
-ifeq ($(RELEASE_ENABLE_LOGCAT_PERSISTENCE),true)
-  PRODUCT_ENABLE_LOGCAT_PERSISTENCE := $(RELEASE_ENABLE_LOGCAT_PERSISTENCE)
-endif
-
-# Include logpersist build target if logcat persistence is enabled.
-ifeq ($(PRODUCT_ENABLE_LOGCAT_PERSISTENCE),true)
-    PRODUCT_PACKAGES += \
-        logpersist.start
-endif
-
-ifeq ($(RELEASE_LOGCAT_ENABLE_PRUNE_ON_START),true)
-    # The property determines whether logcat file pruning is performed at system boot.
-    PRODUCT_PRODUCT_PROPERTIES += ro.logcat.prune_old_log_files_on_start=true
-endif
-
 # The set of packages whose code can be loaded by the system server.
 PRODUCT_SYSTEM_SERVER_APPS += \
     SettingsProvider \
