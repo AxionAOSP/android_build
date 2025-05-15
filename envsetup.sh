@@ -1875,6 +1875,8 @@ function rbr() {
         echo "Skipped Repos:"
         printf ' - %s\n' "${SKIPPED_REPOS[@]}"
     fi
+    
+    cd "$ANDROID_BUILD_TOP" 2>/dev/null
 }
 
 setup_keys
