@@ -503,6 +503,13 @@ $(call add_json_map, PartitionVarsForSoongMigrationOnlyDoNotUse)
 
   $(call add_json_list, ProductPackages, $(PRODUCT_PACKAGES))
   $(call add_json_list, ProductPackagesDebug, $(PRODUCT_PACKAGES_DEBUG))
+  $(call add_json_list, ProductPackagesEng, $(PRODUCT_PACKAGES_ENG))
+  $(call add_json_list, ProductPackagesDebugAsan, $(PRODUCT_PACKAGES_DEBUG_ASAN))
+  $(call add_json_list, ProductPackagesDebugJavaCoverage, $(PRODUCT_PACKAGES_DEBUG_JAVA_COVERAGE))
+  $(call add_json_list, ProductPackagesArm64, $(PRODUCT_PACKAGES_ARM64))
+  $(call add_json_list, ProductPackagesShippingApiLevel29, $(PRODUCT_PACKAGES_SHIPPING_API_LEVEL_29))
+  $(call add_json_list, ProductPackagesShippingApiLevel33, $(PRODUCT_PACKAGES_SHIPPING_API_LEVEL_33))
+  $(call add_json_list, ProductPackagesShippingApiLevel34, $(PRODUCT_PACKAGES_SHIPPING_API_LEVEL_34))
 
   # Used to generate /vendor/linker.config.pb
   $(call add_json_list, VendorLinkerConfigSrcs, $(PRODUCT_VENDOR_LINKER_CONFIG_FRAGMENTS))

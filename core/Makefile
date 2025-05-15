@@ -3498,6 +3498,7 @@ $(check-selinux-treble-labeling.timestamp): PRIVATE_PLATFORM_SEAPP_CONTEXTS := $
 $(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_SEAPP_CONTEXTS := $(vendor-seapp-contexts)
 $(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_FILE_CONTEXTS := $(vendor-file-contexts)
 $(check-selinux-treble-labeling.timestamp): PRIVATE_TRACKING_LIST_FILE := $(PRODUCT_SELINUX_TREBLE_LABELING_TRACKING_LIST_FILE)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_TREAT_AS_WARNINGS := $(if $(filter true,$(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING)),,--treat_as_warnings)
 $(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_labeling_tests \
     $(platform-preinstalled-apps) $(vendor-preinstalled-apps) \
     $(platform-sepolicy-binary) $(sepolicy-binary) $(sepolicy-binary-without-vendor) \
@@ -3513,14 +3514,13 @@ $(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_label
     --vendor_seapp_contexts $(PRIVATE_VENDOR_SEAPP_CONTEXTS) \
     --vendor_file_contexts $(PRIVATE_VENDOR_FILE_CONTEXTS) \
     $(if $(PRIVATE_TRACKING_LIST_FILE),--tracking_list_file $(PRIVATE_TRACKING_LIST_FILE)) \
+    $(PRIVATE_TREAT_AS_WARNINGS) \
     --aapt2_path $(AAPT2) > $@
 
 .PHONY: check-selinux-treble-labeling
 check-selinux-treble-labeling: $(check-selinux-treble-labeling.timestamp)
 
-ifeq ($(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING),true)
 droidcore: check-selinux-treble-labeling
-endif  # PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING
 
 platform-preinstalled-apps-patterns :=
 platform-preinstalled-apps :=
@@ -7282,18 +7282,16 @@ _symbols_zip_modules_mapping_files :=
 
 endif # ifeq (,$(TARGET_BUILD_UNBUNDLED))
 
-ifeq (true,$(EMMA_INSTRUMENT))
 #------------------------------------------------------------------
 # An archive of classes for use in generating code-coverage reports
 # These are the uninstrumented versions of any classes that were
 # to be instrumented.
 # Any dependencies are set up later in build/make/core/main.mk.
 
+ifeq (true,$(EMMA_INSTRUMENT))
+# The unbundled build is handled by soong in unbundled.go
 ifeq (,$(TARGET_BUILD_UNBUNDLED))
-  _jacoco_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
-else
-  _jacoco_modules := $(unbundled_build_modules)
-endif
+_jacoco_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
 
 # This is not ideal, but it is difficult to correctly figure out the actual jacoco report
 # jars we need to add here as dependencies, so we add the device-tests as a dependency when
@@ -7314,6 +7312,7 @@ $(JACOCO_REPORT_CLASSES_ALL): $(SOONG_ZIP) $(foreach m,$(_jacoco_modules),$(ALL_
 
 _jacoco_modules :=
 
+endif # ifeq (,$(TARGET_BUILD_UNBUNDLED))
 endif # EMMA_INSTRUMENT=true
 
 
