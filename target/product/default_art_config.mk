@@ -147,6 +147,12 @@ else
 
 endif
 
+ifeq ($(RELEASE_TELEPHONY_MODULE),true)
+    PRODUCT_APEX_BOOT_JARS += \
+        com.android.telephony2:framework-telephony \
+
+endif
+
 # List of system_server classpath jars delivered via apex.
 # Keep the list sorted by module names and then library names.
 # Note: For modules available in Q, DO NOT add new entries here.

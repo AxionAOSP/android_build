@@ -263,6 +263,10 @@ $(call soong_config_set,bootclasspath,release_package_profiling_module,$(RELEASE
 # Move VCN from platform to the Tethering module; used by both platform and module
 $(call soong_config_set,ANDROID,is_vcn_in_mainline,$(RELEASE_MOVE_VCN_TO_MAINLINE))
 
+# Add telephony build flag to soong
+$(call soong_config_set,ANDROID,release_telephony_module,$(RELEASE_TELEPHONY_MODULE))
+$(call soong_config_set,bootclasspath,release_telephony_module,$(RELEASE_TELEPHONY_MODULE))
+
 # Add perf-setup build flag to soong
 # Note: BOARD_PERFSETUP_SCRIPT location must be under platform_testing/scripts/perf-setup/.
 ifdef BOARD_PERFSETUP_SCRIPT

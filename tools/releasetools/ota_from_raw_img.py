@@ -37,7 +37,9 @@ from ota_signing_utils import AddSigningArgumentParse
 logger = logging.getLogger(__name__)
 
 
-def ResolveBinaryPath(filename, search_path):
+def ResolveBinaryPath(filename, search_path, bin_path):
+  if bin_path is not None:
+    return bin_path
   if not search_path:
     return filename
   if not os.path.exists(search_path):
@@ -88,6 +90,8 @@ def main(argv):
                       help="Optional OTA metadata proto to use for signing")
   parser.add_argument("--dynamic_partition_info_file", type=str,
                       help="Optional dynamic partition info file")
+  parser.add_argument("--delta_generator_path", type=str,
+                      help="Path to delta_generator")
   parser.add_argument("-v", action="store_true",
                       help="Enable verbose logging", dest="verbose")
   AddSigningArgumentParse(parser)
@@ -108,7 +112,7 @@ def main(argv):
     args.partition_names = args.partition_names.split(",")
   with tempfile.NamedTemporaryFile() as unsigned_payload, tempfile.NamedTemporaryFile() as dynamic_partition_info_file:
     WriteDynamicPartitionInfo(args.dynamic_partition_info_file, dynamic_partition_info_file)
-    cmd = [ResolveBinaryPath("delta_generator", args.search_path)]
+    cmd = [ResolveBinaryPath("delta_generator", args.search_path, args.delta_generator_path)]
     cmd.append("--partition_names=" + ":".join(args.partition_names))
     cmd.append("--dynamic_partition_info_file=" +
                dynamic_partition_info_file.name)
