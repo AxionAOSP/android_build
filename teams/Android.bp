@@ -3108,7 +3108,7 @@ team {
 }
 
 team {
-    name: "trendy_team_wear_wearflow",
+    name: "trendy_team_wear_remote_compose",
 
     // go/trendy/manage/engineers/5947250429558784
     trendy_team_id: "5947250429558784",
