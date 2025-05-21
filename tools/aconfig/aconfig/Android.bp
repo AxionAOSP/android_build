@@ -82,31 +82,19 @@ aconfig_declarations {
     srcs: ["tests/test_force_read_only.aconfig"],
 }
 
-aconfig_values {
-    name: "aconfig.test.flag.values",
-    package: "com.android.aconfig.test",
-    srcs: [
-        "tests/first.values",
-        "tests/second.values",
-    ],
-}
-
-aconfig_values {
-    name: "aconfig.test.flag.second_values",
-    package: "com.android.aconfig.test",
-    srcs: [
-        "tests/third.values",
-    ],
-}
-
-aconfig_value_set {
-    name: "aconfig.test.flag.value_set",
-    values: [
-        "aconfig.test.flag.values",
-    ],
+aconfig_declarations {
+    name: "mainline_beta_mockup_flags",
+    package: "com.android.aconfig.test.mainline_beta",
+    container: "com.android.mainline_beta_mockup",
+    srcs: ["tests/mainline_beta_mockup.aconfig"],
 }
 
 // integration tests: java
+
+java_aconfig_library {
+    name: "aconfig_test_mainline_beta_java_library",
+    aconfig_declarations: "mainline_beta_mockup_flags",
+}
 
 java_aconfig_library {
     name: "aconfig_test_java_library",
@@ -136,6 +124,7 @@ android_test {
         "aconfig_test_java_library",
         "aconfig_test_java_library_exported",
         "aconfig_test_java_library_forcereadonly",
+        "aconfig_test_mainline_beta_java_library",
         "androidx.test.rules",
         "testng",
     ],

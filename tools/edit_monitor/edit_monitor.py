@@ -113,7 +113,7 @@ class ClearcutEventHandler(PatternMatchingEventHandler):
       )
       event_proto.single_edit_event.CopyFrom(
           edit_event_pb2.EditEvent.SingleEditEvent(
-              file_path=event.src_path, edit_type=edit_type
+              edit_type=edit_type
           )
       )
       with self._pending_events_lock:

@@ -558,8 +558,7 @@ pub fn should_include_flag(pf: &ProtoParsedFlag) -> bool {
     let is_disabled_ro = pf.state == Some(ProtoFlagState::DISABLED.into())
         && pf.permission == Some(ProtoFlagPermission::READ_ONLY.into());
 
-    !((is_platform_container && is_disabled_ro)
-        || pf.metadata.storage() == ProtoFlagStorageBackend::DEVICE_CONFIG)
+    !(is_platform_container && is_disabled_ro)
 }
 
 #[cfg(test)]
@@ -1305,15 +1304,6 @@ mod tests {
         let m = pf.metadata.as_mut().unwrap();
         m.set_storage(ProtoFlagStorageBackend::DEVICE_CONFIG);
         let flag_ids = assign_flag_ids(&package, parsed_flags.parsed_flag.iter()).unwrap();
-        let expected_flag_ids = HashMap::from([
-            (String::from("disabled_rw"), 0_u16),
-            (String::from("disabled_rw_exported"), 1_u16),
-            (String::from("enabled_fixed_ro"), 2_u16),
-            (String::from("enabled_fixed_ro_exported"), 3_u16),
-            (String::from("enabled_ro"), 4_u16),
-            (String::from("enabled_ro_exported"), 5_u16),
-            (String::from("enabled_rw"), 6_u16),
-        ]);
         assert_eq!(flag_ids, expected_flag_ids);
     }
 

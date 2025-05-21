@@ -81,19 +81,15 @@ class EditMonitorTest(unittest.TestCase):
     logged_events = self._get_logged_events()
     self.assertEqual(len(logged_events), 4)
     expected_create_event = edit_event_pb2.EditEvent.SingleEditEvent(
-        file_path=str(test_dir.joinpath('test.txt').resolve()),
         edit_type=edit_event_pb2.EditEvent.CREATE,
     )
     expected_modify_event = edit_event_pb2.EditEvent.SingleEditEvent(
-        file_path=str(test_dir.joinpath('test.txt').resolve()),
         edit_type=edit_event_pb2.EditEvent.MODIFY,
     )
     expected_move_event = edit_event_pb2.EditEvent.SingleEditEvent(
-        file_path=str(test_dir.joinpath('test.txt').resolve()),
         edit_type=edit_event_pb2.EditEvent.MOVE,
     )
     expected_delete_event = edit_event_pb2.EditEvent.SingleEditEvent(
-        file_path=str(test_dir.joinpath('new_test.txt').resolve()),
         edit_type=edit_event_pb2.EditEvent.DELETE,
     )
     self.assertEqual(

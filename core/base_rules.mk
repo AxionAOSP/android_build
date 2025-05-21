@@ -505,12 +505,8 @@ my_path_comp :=
 
 my_installed_symlinks :=
 
-ifneq (,$(LOCAL_SOONG_INSTALLED_MODULE))
-  # Soong already generated the copy rule, but make the installed location depend on the Make
-  # copy of the intermediates for now, as some rules that collect intermediates may expect
-  # them to exist.
-  $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
-else ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
+ifeq (,$(LOCAL_SOONG_INSTALLED_MODULE))
+ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
   $(LOCAL_INSTALLED_MODULE): PRIVATE_POST_INSTALL_CMD := $(LOCAL_POST_INSTALL_CMD)
   $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
 	@echo "Install: $@"
@@ -530,6 +526,7 @@ else ifneq (true,$(LOCAL_UNINSTALLABLE_MODULE))
   $(my_all_targets) : | $(my_installed_symlinks)
 
 endif # !LOCAL_UNINSTALLABLE_MODULE
+endif # !LOCAL_SOONG_INSTALLED_MODULE
 
 # Add dependencies on LOCAL_SOONG_INSTALL_SYMLINKS if we're installing any kind of module, not just
 # ones that set LOCAL_SOONG_INSTALLED_MODULE. This is so we can have a soong module that only

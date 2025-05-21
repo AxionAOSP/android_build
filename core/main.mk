@@ -1447,8 +1447,6 @@ droidcore: droidcore-unbundled
 # dist_files only for putting your library into the dist directory with a full build.
 .PHONY: dist_files
 
-$(call dist-for-goals, dist_files, $(PRODUCT_OUT)/module-info.json)
-
 .PHONY: apps_only
 ifeq ($(HOST_OS),darwin)
   # Mac only supports building host modules

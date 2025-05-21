@@ -1,5 +1,9 @@
 {
     "namespaces": {
+        "com_android_mainline_beta_mockup": {
+            "container": "com.android.mainline_beta_mockup",
+            "allow_exported": true
+        },
         "com_android_tethering": {
             "container": "com.android.tethering",
             "allow_exported": true
