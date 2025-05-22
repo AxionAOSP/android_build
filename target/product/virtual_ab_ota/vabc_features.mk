@@ -55,7 +55,7 @@ PRODUCT_VENDOR_PROPERTIES += ro.virtual_ab.compression.xor.enabled?=true
 
 # Enabling this property will assign CPUSET_SP_BACKGROUND to readahead threads
 # and merge threads.
-# PRODUCT_VENDOR_PROPERTIES += ro.virtual_ab.should_set_task_profiles=true
+# PRODUCT_VENDOR_PROPERTIES += ro.virtual_ab.set_task_profiles=true
 
 # Enabling this property will skip verification post OTA reboot.
 # Verification allows the device to safely roll back if any boot failures
