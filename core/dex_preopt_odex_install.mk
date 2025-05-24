@@ -515,7 +515,7 @@ ifdef LOCAL_DEX_PREOPT
   _dexname := $(basename $(notdir $(_dexlocation)))
   _system_other := $(strip $(if $(strip $(BOARD_USES_SYSTEM_OTHER_ODEX)), \
     $(if $(strip $(SANITIZE_LITE)),, \
-      $(if $(filter $(_dexname),$(PRODUCT_DEXPREOPT_SPEED_APPS))$(filter $(_dexname),$(PRODUCT_SYSTEM_SERVER_APPS)),, \
+      $(if $(filter $(_dexname),$(PRODUCT_SYSTEM_SERVER_APPS)),, \
         $(if $(strip $(foreach myfilter,$(SYSTEM_OTHER_ODEX_FILTER),$(filter system/$(myfilter),$(_dexlocation))$(filter $(myfilter),$(_dexlocation)))), \
             system_other/)))))
   # _dexdir has a trailing /

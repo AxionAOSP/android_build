@@ -1454,39 +1454,15 @@ ifeq ($(HOST_OS),darwin)
 
 else ifneq ($(TARGET_BUILD_APPS),)
   # If this build is just for apps, only build apps and not the full system by default.
-
-  # Dist the installed files if they exist, except the installed symlinks. dist-for-goals emits
-  # `cp src dest` commands, which will fail to copy dangling symlinks.
-  apps_only_installed_files := $(foreach m,$(unbundled_build_modules),\
-    $(filter-out $(ALL_MODULES.$(m).INSTALLED_SYMLINKS),$(ALL_MODULES.$(m).INSTALLED)))
-  $(call dist-for-goals,apps_only, $(apps_only_installed_files))
-
-  # Dist the bundle files if they exist.
-  apps_only_bundle_files := $(foreach m,$(unbundled_build_modules),\
-    $(if $(ALL_MODULES.$(m).BUNDLE),$(ALL_MODULES.$(m).BUNDLE):$(m)-base.zip))
-  $(call dist-for-goals,apps_only, $(apps_only_bundle_files))
-
-  # For uninstallable modules such as static Java library, we have to dist the built file,
-  # as <module_name>.<suffix>
-  apps_only_dist_built_files := $(foreach m,$(unbundled_build_modules),$(if $(ALL_MODULES.$(m).INSTALLED),,\
-      $(if $(ALL_MODULES.$(m).BUILT),$(ALL_MODULES.$(m).BUILT):$(m)$(suffix $(ALL_MODULES.$(m).BUILT)))\
-      $(if $(ALL_MODULES.$(m).AAR),$(ALL_MODULES.$(m).AAR):$(m).aar)\
-      ))
-  $(call dist-for-goals,apps_only, $(apps_only_dist_built_files))
-
-  # some more files are disted in soong's unbundled_builder module
+  # The majority of this block has been converted to soong's unbundled_builder module.
 
 apps_only: $(unbundled_build_modules)
 
 droid_targets: apps_only
 
-# NOTICE files for a apps_only build
-$(eval $(call html-notice-rule,$(target_notice_file_html_or_xml),"Apps","Notices for files for apps:",$(unbundled_build_modules),$(PRODUCT_OUT)/ $(HOST_OUT)/))
-
 $(eval $(call text-notice-rule,$(target_notice_file_txt),"Apps","Notices for files for apps:",$(unbundled_build_modules),$(PRODUCT_OUT)/ $(HOST_OUT)/))
 
 $(call declare-0p-target,$(target_notice_file_txt))
-$(call declare-0p-target,$(target_notice_html_or_xml))
 
 
 else ifeq ($(TARGET_BUILD_UNBUNDLED),$(TARGET_BUILD_UNBUNDLED_IMAGE))
