@@ -199,6 +199,7 @@ PRODUCT_STANDALONE_SYSTEM_SERVER_JARS := \
 # List of jars delivered via apex that system_server loads dynamically using separate classloaders.
 # Keep the list sorted by module names and then library names.
 # Note: For modules available in Q, DO NOT add new entries here.
+# The Soong modules for these jars should inherit standalone-system-server-module-optimize-defaults.
 PRODUCT_APEX_STANDALONE_SYSTEM_SERVER_JARS := \
     com.android.bt:service-bluetooth \
     com.android.devicelock:service-devicelock \
