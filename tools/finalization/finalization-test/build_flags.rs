@@ -20,11 +20,12 @@ use std::collections::HashMap;
 use std::fs;
 
 #[allow(dead_code)]
-pub const FLAGS_WE_CARE_ABOUT: [&str; 4] = [
+pub const FLAGS_WE_CARE_ABOUT: [&str; 5] = [
     "RELEASE_PLATFORM_SDK_VERSION",
     "RELEASE_PLATFORM_SDK_VERSION_FULL",
     "RELEASE_PLATFORM_VERSION",
     "RELEASE_PLATFORM_VERSION_CODENAME",
+    "RELEASE_HIDDEN_API_EXPORTABLE_STUBS",
 ];
 
 // A map of release-config -name -> map of flag-name -> flag-value
@@ -74,7 +75,21 @@ fn parse_release_config(build_flag_map: &mut BuildFlagMap, release_config: &Rele
         .iter()
         .filter(|flag| FLAGS_WE_CARE_ABOUT.contains(&flag.flag_declaration.name()))
         .map(|flag| {
-            (flag.flag_declaration.name().to_string(), flag.value.string_value().to_string())
+            // Flag values are expected to be strings or bools, or not set. In this tool, we
+            // represent all types as strings (for simplicity).
+            let value = if flag.value.val.is_none() {
+                // value not set -> ""
+                String::new()
+            } else if flag.value.has_string_value() {
+                // already a string, use as is
+                flag.value.string_value().to_string()
+            } else if flag.value.has_bool_value() {
+                // convert bool to "true" or "false"
+                format!("{}", flag.value.bool_value())
+            } else {
+                panic!("unexpected protobuf value type: {:?}", flag.value);
+            };
+            (flag.flag_declaration.name().to_string(), value)
         })
         .collect();
     build_flag_map.insert(release_config.name().to_string(), x);

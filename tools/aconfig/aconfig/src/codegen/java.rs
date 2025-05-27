@@ -267,7 +267,7 @@ fn add_feature_flags_impl_template(context: &Context, template: &mut TinyTemplat
         true => {
             ensure!(
                 !context.use_device_config,
-                "using device config in exported mode is currently not supported"
+                "All exported mode codegen should rely on new storage for safety"
             );
             template.add_template(
                 "FeatureFlagsImpl.java",

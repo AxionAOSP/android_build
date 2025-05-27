@@ -117,4 +117,14 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_release_hidden_api_exportable_stubs_is_enabled_in_next() {
+        // invariant: RELEASE_HIDDEN_API_EXPORTABLE_STUBS is set to `true` in `next`, because we'll
+        // cut an Android release from this release config (the flag is too expensive in terms of
+        // build performance to enable everywhere)
+        let next = &RELEASE_CONFIGS.next;
+        let value = &RELEASE_CONFIGS.flags[next]["RELEASE_HIDDEN_API_EXPORTABLE_STUBS"];
+        assert_eq!(value, "true");
+    }
 }
