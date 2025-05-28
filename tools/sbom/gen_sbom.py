@@ -36,6 +36,7 @@ import queue
 import metadata_file_pb2
 import sbom_data
 import sbom_writers
+import sys
 
 # Package type
 PKG_SOURCE = 'SOURCE'

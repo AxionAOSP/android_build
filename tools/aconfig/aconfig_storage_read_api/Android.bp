@@ -51,7 +51,7 @@ rust_test_host {
     test_suites: ["general-tests"],
     defaults: ["aconfig_storage_read_api.defaults"],
     rustlibs: [
-        "librand",
+        "librand-0.8",
         "libaconfig_storage_file_with_test_utils",
     ],
     data: [
