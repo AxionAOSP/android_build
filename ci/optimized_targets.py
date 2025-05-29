@@ -54,8 +54,13 @@ class OptimizedBuildTarget(ABC):
   def get_build_targets(self) -> set[str]:
     features = self.build_context.enabled_build_features
     if self.get_enabled_flag() in features:
-      self.modules_to_build = self.get_build_targets_impl()
-      return self.modules_to_build
+      try:
+        self.modules_to_build = self.get_build_targets_impl()
+        return self.modules_to_build
+      except Exception as e:
+        logging.error(f'error while getting build targets: {e}')
+        # TODO: Report a metric
+        return {self.target}
 
     if self.target == 'general-tests':
       self._report_info_metrics_silently('general-tests.zip')

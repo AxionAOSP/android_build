@@ -168,6 +168,11 @@ mod tests {
         aconfig_files
             .into_iter()
             .map(|(pkg, aconfig_file, aconfig_content, value_file, value_content)| {
+                let extended_permissions_options = crate::commands::ExtendedPermissionsOptions {
+                    default_permission: crate::commands::DEFAULT_FLAG_PERMISSION,
+                    allow_read_write: true,
+                    force_read_only: false,
+                };
                 let bytes = crate::commands::parse_flags(
                     pkg,
                     "system",
@@ -179,9 +184,8 @@ mod tests {
                         source: format!("tests/{}", value_file).to_string(),
                         reader: Box::new(value_content),
                     }],
-                    crate::commands::DEFAULT_FLAG_PERMISSION,
-                    true,
                     None,
+                    extended_permissions_options,
                 )
                 .unwrap();
                 aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()

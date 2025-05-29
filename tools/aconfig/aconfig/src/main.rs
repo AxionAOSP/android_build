@@ -114,15 +114,20 @@ fn main() -> Result<()> {
             allow_read_write,
             cache_out_path,
             mainline_beta_namespace_config,
+            force_read_only,
         } => {
+            let extended_permissions_options = commands::ExtendedPermissionsOptions {
+                default_permission,
+                allow_read_write,
+                force_read_only,
+            };
             let output = commands::parse_flags(
                 &package,
                 &container,
                 open_zero_or_more_files(&declarations)?, // declarations
                 open_zero_or_more_files(&values)?,       // values
-                default_permission,
-                allow_read_write,
                 mainline_beta_namespace_config,
+                extended_permissions_options,
             )
             .context("failed to create cache")?;
             write_output_to_file_or_stdout(&cache_out_path, &output)?;

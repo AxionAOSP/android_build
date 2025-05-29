@@ -130,6 +130,7 @@ pub enum ParsedCommand {
         allow_read_write: bool,
         cache_out_path: String,
         mainline_beta_namespace_config: Option<PathBuf>,
+        force_read_only: bool,
     },
     CreateJavaLib {
         cache_path: String,
@@ -192,6 +193,12 @@ fn build_cli() -> Command {
                     Arg::new("mainline-beta-namespace-config")
                         .long("mainline-beta-namespace-config")
                         .long_help(MAINLINE_BETA_NAMESPACE_CONFIG.trim()),
+                )
+                .arg(
+                    Arg::new("force-read-only")
+                        .long("force-read-only")
+                        .value_parser(clap::value_parser!(bool))
+                        .default_value("false"),
                 ),
         )
         .subcommand(
@@ -384,6 +391,7 @@ pub fn parse_args(
                 allow_read_write: *get_required_arg::<bool>(sub_matches, "allow-read-write")?,
                 cache_out_path: get_required_arg::<String>(sub_matches, "cache")?.clone(),
                 mainline_beta_namespace_config,
+                force_read_only: *get_required_arg::<bool>(sub_matches, "force-read-only")?,
             })
         }
         Some(("create-java-lib", sub_matches)) => Ok(ParsedCommand::CreateJavaLib {
@@ -487,7 +495,8 @@ mod tests {
              --cache /output/cache.pb \
              --default-permission READ_WRITE \
              --allow-read-write true \
-             --mainline-beta-namespace-config /path/to/some/file.json";
+             --mainline-beta-namespace-config /path/to/some/file.json \
+             --force-read-only false";
         let input_args = create_os_command(command_string);
         let parsed = parse_args(input_args)?;
 
@@ -501,6 +510,7 @@ mod tests {
             allow_read_write,
             cache_out_path,
             mainline_beta_namespace_config,
+            force_read_only,
         } = parsed
         {
             assert_eq!(package, "com.test.cache");
@@ -516,6 +526,7 @@ mod tests {
                 mainline_beta_namespace_config,
                 Some(PathBuf::from("/path/to/some/file.json"))
             );
+            assert!(!force_read_only);
         }
         Ok(())
     }
@@ -674,7 +685,7 @@ mod tests {
         --package
         com.via.respfile
         # This is a comment
-            
+
         --container
         vendor
         --cache
@@ -702,6 +713,7 @@ mod tests {
             default_permission,
             allow_read_write,
             mainline_beta_namespace_config,
+            force_read_only,
         } = parsed
         {
             assert_eq!(package, "com.via.respfile");
@@ -714,6 +726,7 @@ mod tests {
             assert!(allow_read_write);
             assert_eq!(cache_out_path, "cache.pb");
             assert_eq!(mainline_beta_namespace_config, None);
+            assert!(!force_read_only);
         }
 
         Ok(())
@@ -748,6 +761,7 @@ mod tests {
             default_permission,
             allow_read_write,
             mainline_beta_namespace_config,
+            force_read_only,
         } = parsed
         {
             assert_eq!(package, "com.via.respfile");
@@ -760,6 +774,7 @@ mod tests {
             assert!(allow_read_write);
             assert_eq!(cache_out_path, "cache.pb");
             assert_eq!(mainline_beta_namespace_config, None);
+            assert!(!force_read_only);
         }
 
         Ok(())

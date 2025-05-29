@@ -263,6 +263,11 @@ parsed_flag {
 "#;
 
     pub fn parse_read_only_test_flags() -> ProtoParsedFlags {
+        let extended_permissions_options = crate::commands::ExtendedPermissionsOptions {
+            default_permission: crate::commands::DEFAULT_FLAG_PERMISSION,
+            allow_read_write: true,
+            force_read_only: false,
+        };
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.test",
             "system",
@@ -274,15 +279,19 @@ parsed_flag {
                 source: "tests/read_only_test.values".to_string(),
                 reader: Box::new(include_bytes!("../tests/read_only_test.values").as_slice()),
             }],
-            crate::commands::DEFAULT_FLAG_PERMISSION,
-            true,
             None,
+            extended_permissions_options,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()
     }
 
     pub fn parse_test_flags() -> ProtoParsedFlags {
+        let extended_permissions_options = crate::commands::ExtendedPermissionsOptions {
+            default_permission: crate::commands::DEFAULT_FLAG_PERMISSION,
+            allow_read_write: true,
+            force_read_only: false,
+        };
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.test",
             "system",
@@ -300,15 +309,19 @@ parsed_flag {
                     reader: Box::new(include_bytes!("../tests/second.values").as_slice()),
                 },
             ],
-            crate::commands::DEFAULT_FLAG_PERMISSION,
-            true,
             None,
+            extended_permissions_options,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()
     }
 
     pub fn parse_second_package_flags() -> ProtoParsedFlags {
+        let extended_permissions_options = crate::commands::ExtendedPermissionsOptions {
+            default_permission: crate::commands::DEFAULT_FLAG_PERMISSION,
+            allow_read_write: true,
+            force_read_only: false,
+        };
         let bytes = crate::commands::parse_flags(
             "com.android.aconfig.second_test",
             "system",
@@ -320,9 +333,8 @@ parsed_flag {
                 source: "tests/third.values".to_string(),
                 reader: Box::new(include_bytes!("../tests/third.values").as_slice()),
             }],
-            crate::commands::DEFAULT_FLAG_PERMISSION,
-            true,
             None,
+            extended_permissions_options,
         )
         .unwrap();
         aconfig_protos::parsed_flags::try_from_binary_proto(&bytes).unwrap()
