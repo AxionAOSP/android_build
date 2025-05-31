@@ -97,6 +97,8 @@ android.media.tv.flags.hdmi_control_enhanced_behavior
 android.media.tv.flags.tif_extension_standardization
 android.media.tv.flags.tif_unbind_inactive_tis
 android.multiuser.enable_biometrics_to_unlock_private_space
+// TODO(b/411372618): remove after sdk version ramp up for 25Q4
+android.net.platform.flags.connectivity_service_destroy_socket
 android.net.platform.flags.mdns_improvement_for_25q2
 android.nfc.nfc_persist_log
 android.nfc.nfc_watchdog
