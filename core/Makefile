@@ -809,6 +809,13 @@ $(call declare-0p-target,$(APKCERTS_FILE))
 .PHONY: apkcerts-list
 apkcerts-list: $(APKCERTS_FILE)
 
+ifneq (,$(TARGET_BUILD_APPS))
+  $(call dist-for-goals, apps_only, $(APKCERTS_FILE):apkcerts.txt)
+endif
+
+# In unbundled builds, apexkeys.txt is built by soong
+ifeq (,$(TARGET_BUILD_APPS))
+
 intermediates := $(call intermediates-dir-for,PACKAGING,apexkeys)
 APEX_KEYS_FILE := $(intermediates)/apexkeys.txt
 
@@ -825,10 +832,7 @@ $(call declare-0p-target,$(APEX_KEYS_FILE))
 .PHONY: apexkeys.txt
 apexkeys.txt: $(APEX_KEYS_FILE)
 
-ifneq (,$(TARGET_BUILD_APPS))
-  $(call dist-for-goals, apps_only, $(APKCERTS_FILE):apkcerts.txt)
-  $(call dist-for-goals, apps_only, $(APEX_KEYS_FILE):apexkeys.txt)
-endif
+endif # ifeq (,$(TARGET_BUILD_APPS))
 
 
 # -----------------------------------------------------------------

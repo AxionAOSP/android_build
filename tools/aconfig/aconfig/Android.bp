@@ -7,9 +7,10 @@ rust_defaults {
     edition: "2021",
     clippy_lints: "android",
     lints: "android",
+    crate_root: "src/main.rs",
     srcs: [
-        "src/main.rs",
         ":finalized_flags_record.json",
+        "templates/*.template",
     ],
     rustlibs: [
         "libaconfig_protos",

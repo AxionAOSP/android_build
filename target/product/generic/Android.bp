@@ -582,7 +582,6 @@ system_image_defaults {
         "fsck.erofs",
         "fsck.f2fs", // for media_system
         "fsck_msdos",
-        "fsverity-release-cert-der",
         "gatekeeperd",
         "gpu_counter_producer",
         "gpuservice",

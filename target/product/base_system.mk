@@ -103,7 +103,6 @@ PRODUCT_PACKAGES += \
     framework-sysconfig.xml \
     fsck.erofs \
     fsck_msdos \
-    fsverity-release-cert-der \
     fs_config_files_system \
     fs_config_dirs_system \
     gpu_counter_producer \
