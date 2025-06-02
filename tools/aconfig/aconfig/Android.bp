@@ -90,11 +90,25 @@ aconfig_declarations {
     srcs: ["tests/mainline_beta_mockup.aconfig"],
 }
 
+aconfig_declarations {
+    name: "mainline_beta_exported_mockup_flags",
+    package: "com.android.aconfig.test.exported.mainline_beta",
+    container: "com.android.mainline_beta_mockup",
+    srcs: ["tests/mainline_beta_exported_mockup.aconfig"],
+    exportable: true,
+}
+
 // integration tests: java
 
 java_aconfig_library {
     name: "aconfig_test_mainline_beta_java_library",
     aconfig_declarations: "mainline_beta_mockup_flags",
+}
+
+java_aconfig_library {
+    name: "aconfig_test_mainline_beta_java_library_exported",
+    aconfig_declarations: "mainline_beta_exported_mockup_flags",
+    mode: "exported",
 }
 
 java_aconfig_library {
@@ -126,6 +140,7 @@ android_test {
         "aconfig_test_java_library_exported",
         "aconfig_test_java_library_forcereadonly",
         "aconfig_test_mainline_beta_java_library",
+        "aconfig_test_mainline_beta_java_library_exported",
         "androidx.test.rules",
         "testng",
     ],

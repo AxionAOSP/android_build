@@ -14,6 +14,7 @@ import static com.android.aconfig.test.forcereadonly.Flags.froRw;
 import static com.android.aconfig.test.mainline_beta.Flags.betaDisabledRw;
 import static com.android.aconfig.test.mainline_beta.Flags.betaEnabledRw;
 import static com.android.aconfig.test.mainline_beta.Flags.betaDisabledFixedRo;
+import static com.android.aconfig.test.exported.mainline_beta.Flags.exportedBetaDisabledRw;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -89,5 +90,10 @@ public final class AconfigTest {
 	@Test
     public void testBetaDisabledFixedRo() {
         assertFalse(betaDisabledFixedRo());
+    }
+
+	@Test
+    public void testExportedBetaDisabledRw() {
+        assertFalse(exportedBetaDisabledRw());
     }
 }

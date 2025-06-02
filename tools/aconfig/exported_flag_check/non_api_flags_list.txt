@@ -151,6 +151,8 @@ com.android.aconfig.test.disabled_rw_exported
 com.android.aconfig.test.enabled_fixed_ro_exported
 com.android.aconfig.test.enabled_ro_exported
 com.android.aconfig.test.exported.exported_flag
+com.android.aconfig.test.exported.mainline_beta.exported_beta_disabled_rw
+com.android.aconfig.test.exported.mainline_beta.exported_beta_enabled_rw
 com.android.aconfig.test.forcereadonly.fro_exported
 com.android.adservices.flags.ad_id_cache_enabled
 com.android.adservices.flags.adservices_enablement_check_enabled
