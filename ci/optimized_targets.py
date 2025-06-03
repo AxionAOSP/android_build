@@ -59,7 +59,8 @@ class OptimizedBuildTarget(ABC):
         return self.modules_to_build
       except Exception as e:
         logging.error(f'error while getting build targets: {e}')
-        # TODO: Report a metric
+        metrics_agent_instance = metrics_agent.MetricsAgent.instance()
+        metrics_agent_instance.report_unoptimized_target(self.target, f'Error in optimized target for {self.target}: {repr(e)}')
         return {self.target}
 
     if self.target == 'general-tests':
