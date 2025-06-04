@@ -982,6 +982,15 @@ ALL_MODULES.$(my_register_name).SOONG_MODULE_TYPE := \
     $(ALL_MODULES.$(my_register_name).SOONG_MODULE_TYPE) $(LOCAL_SOONG_MODULE_TYPE)
 ALL_MODULES.$(my_register_name).IS_SOONG_MODULE := \
     $(if $(filter $(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK)),true)
+# .IS_SOONG_MODULE above will get reset to an empty string if it encounters a make module with the
+# same name as a soong module. The following 3 variables allow for more nuanced detection when it's
+# both a make and soong module.
+ALL_MODULES.$(my_register_name).IS_SOONG_MODULE_AND_POTENTIALLY_ALSO_MAKE_MODULE := \
+    $(or $(ALL_MODULES.$(my_register_name).IS_SOONG_MODULE_AND_POTENTIALLY_ALSO_MAKE_MODULE),$(if $(filter $(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK)),true))
+ALL_MODULES.$(my_register_name).IS_MAKE_MODULE_AND_POTENTIALLY_ALSO_SOONG_MODULE := \
+    $(or $(ALL_MODULES.$(my_register_name).IS_MAKE_MODULE_AND_POTENTIALLY_ALSO_SOONG_MODULE),$(if $(filter $(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK)),,true))
+ALL_MODULES.$(my_register_name).IS_MAKE_AND_SOONG_MODULE := \
+    $(and $(ALL_MODULES.$(my_register_name).IS_SOONG_MODULE_AND_POTENTIALLY_ALSO_MAKE_MODULE),$(ALL_MODULES.$(my_register_name).IS_MAKE_MODULE_AND_POTENTIALLY_ALSO_SOONG_MODULE))
 ifndef LOCAL_IS_HOST_MODULE
 ALL_MODULES.$(my_register_name).TARGET_BUILT := \
     $(ALL_MODULES.$(my_register_name).TARGET_BUILT) $(LOCAL_BUILT_MODULE)
