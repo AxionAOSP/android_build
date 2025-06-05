@@ -1790,9 +1790,13 @@ function initPixelRoomService() {
 }
 
 function rbr() {
+    set +m
+
     local ROOT_DIR="$(pwd)"
     local MANIFEST_FILE="$ROOT_DIR/android/snippets/axion.xml"
     local TARGET_BRANCH="lineage-22.2"
+    local UPSTREAM_REMOTE="axion"
+    local MAX_JOBS=12
 
     if [[ ! -f "$MANIFEST_FILE" ]]; then
         echo "[ERROR] Manifest file not found: $MANIFEST_FILE"
@@ -1801,60 +1805,88 @@ function rbr() {
 
     echo "[INFO] Parsing manifest: $MANIFEST_FILE"
 
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+    grep '<project ' "$MANIFEST_FILE" | \
+        grep "remote=\"$UPSTREAM_REMOTE\"" | \
+        sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2/p' > "$TMP_REPO_LIST"
+
     local -a SUCCESS_REPOS=()
     local -a SKIPPED_REPOS=()
     local -a FAILED_REPOS=()
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
 
-    local TMP_REPO_LIST
-    TMP_REPO_LIST=$(mktemp)
+    process_repo() {
+        local REPO_PATH="$1"
+        local REPO_NAME="$2"
 
-    grep '<project ' "$MANIFEST_FILE" | \
-        grep 'remote="axion"' | \
-        sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2/p' > "$TMP_REPO_LIST"
-
-    while IFS='|' read -r REPO_PATH REPO_NAME; do
-        echo ""
         echo "[INFO] Processing $REPO_PATH ($REPO_NAME)..."
 
-        cd "$ROOT_DIR/$REPO_PATH" 2>/dev/null || {
+        if [[ ! -d "$ROOT_DIR/$REPO_PATH" ]]; then
             echo "[WARN] Directory $REPO_PATH not found, skipping."
-            SKIPPED_REPOS+=("$REPO_PATH")
-            continue
-        }
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
 
         echo "[INFO] Fetching from LineageOS/$REPO_NAME..."
-        if ! git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" 2>/dev/null; then
+        if ! git -C "$ROOT_DIR/$REPO_PATH" fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" 2>/dev/null; then
             echo "[WARN] Branch '$TARGET_BRANCH' not found in LineageOS/$REPO_NAME, skipping."
-            SKIPPED_REPOS+=("$REPO_PATH")
-            continue
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
         fi
 
         echo "[INFO] Rebasing onto LineageOS/$TARGET_BRANCH..."
-        if ! git rebase FETCH_HEAD 2>/dev/null; then
-            if git status | grep -q "You have unmerged paths"; then
-                echo "[ERROR] Rebase conflict in $REPO_PATH. Please resolve manually."
-                FAILED_REPOS+=("$REPO_PATH")
-            else
-                echo "[WARN] Rebase failed in $REPO_PATH. Aborting."
-                FAILED_REPOS+=("$REPO_PATH")
-            fi
-            git rebase --abort >/dev/null 2>&1
-            continue
+        if ! git -C "$ROOT_DIR/$REPO_PATH" rebase FETCH_HEAD 2>/dev/null; then
+            echo "[ERROR] Rebase failed or conflict in $REPO_PATH."
+            git -C "$ROOT_DIR/$REPO_PATH" rebase --abort >/dev/null 2>&1
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
         fi
 
-        echo "[INFO] Force pushing to axion/$TARGET_BRANCH..."
-        if ! git push -f --set-upstream axion "$TARGET_BRANCH" 2>/dev/null; then
-            echo "[INFO] Repo $REPO_PATH is updated."
-            SKIPPED_REPOS+=("$REPO_PATH")
-            continue
+        if ! git -C "$ROOT_DIR/$REPO_PATH" push -f --set-upstream "$UPSTREAM_REMOTE" "$TARGET_BRANCH" 2>/dev/null; then
+            echo "[INFO] Push failed or unnecessary for $REPO_PATH"
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
         fi
 
         echo "[OK] Successfully rebased and pushed: $REPO_PATH"
-        SUCCESS_REPOS+=("$REPO_PATH")
+        echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+    }
 
+    TOTAL_REPOS=$(wc -l < "$TMP_REPO_LIST")
+    PROCESSED=0
+    JOBS=0
+
+    echo "[INFO] Performing rebase operations"
+
+    while IFS='|' read -r REPO_PATH REPO_NAME; do
+        PROCESSED=$((PROCESSED + 1))
+        echo "Processing $PROCESSED/$TOTAL_REPOS: $REPO_PATH..."
+
+        { (process_repo "$REPO_PATH" "$REPO_NAME" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+
+        JOBS=$((JOBS + 1))
+        if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
+            wait -n
+            JOBS=$((JOBS - 1))
+        fi
     done < "$TMP_REPO_LIST"
 
-    rm -f "$TMP_REPO_LIST"
+    wait
+
+    for STATUS_FILE in "$TMP_DIR"/*.status; do
+        [[ ! -f "$STATUS_FILE" ]] && continue
+        RESULT=$(cut -d' ' -f1 "$STATUS_FILE")
+        REPO=$(cut -d' ' -f2- "$STATUS_FILE")
+        case "$RESULT" in
+            SUCCESS) SUCCESS_REPOS+=("$REPO") ;;
+            SKIPPED) SKIPPED_REPOS+=("$REPO") ;;
+            FAILED)  FAILED_REPOS+=("$REPO") ;;
+        esac
+    done
+
+    rm -rf "$TMP_REPO_LIST" "$TMP_DIR"
 
     echo ""
     echo "[DONE] All repositories processed."
@@ -1875,8 +1907,6 @@ function rbr() {
         echo "Skipped Repos:"
         printf ' - %s\n' "${SKIPPED_REPOS[@]}"
     fi
-    
-    cd "$ANDROID_BUILD_TOP" 2>/dev/null
 }
 
 setup_keys
