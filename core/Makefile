@@ -3523,6 +3523,7 @@ $(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_SEAPP_CONTEXTS := $(v
 $(check-selinux-treble-labeling.timestamp): PRIVATE_VENDOR_FILE_CONTEXTS := $(vendor-file-contexts)
 $(check-selinux-treble-labeling.timestamp): PRIVATE_TRACKING_LIST_FILE := $(PRODUCT_SELINUX_TREBLE_LABELING_TRACKING_LIST_FILE)
 $(check-selinux-treble-labeling.timestamp): PRIVATE_TREAT_AS_WARNINGS := $(if $(filter true,$(PRODUCT_ENFORCE_SELINUX_TREBLE_LABELING)),,--treat_as_warnings)
+$(check-selinux-treble-labeling.timestamp): PRIVATE_DEBUGGABLE := $(if $(filter user,$(TARGET_BUILD_VARIANT)),,--debuggable)
 $(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_labeling_tests \
     $(platform-preinstalled-apps) $(vendor-preinstalled-apps) \
     $(platform-sepolicy-binary) $(sepolicy-binary) $(sepolicy-binary-without-vendor) \
@@ -3538,13 +3539,16 @@ $(check-selinux-treble-labeling.timestamp): $(HOST_OUT_EXECUTABLES)/treble_label
     --vendor_seapp_contexts $(PRIVATE_VENDOR_SEAPP_CONTEXTS) \
     --vendor_file_contexts $(PRIVATE_VENDOR_FILE_CONTEXTS) \
     $(if $(PRIVATE_TRACKING_LIST_FILE),--tracking_list_file $(PRIVATE_TRACKING_LIST_FILE)) \
-    $(PRIVATE_TREAT_AS_WARNINGS) \
+    $(PRIVATE_TREAT_AS_WARNINGS) $(PRIVATE_DEBUGGABLE) \
     --aapt2_path $(AAPT2) > $@
 
 .PHONY: check-selinux-treble-labeling
 check-selinux-treble-labeling: $(check-selinux-treble-labeling.timestamp)
 
+# Treble Labeling tests only for 202604 or later
+ifeq ($(call math_gt_or_eq,$(PLATFORM_SEPOLICY_VERSION),202604),true)
 droidcore: check-selinux-treble-labeling
+endif
 
 platform-preinstalled-apps-patterns :=
 platform-preinstalled-apps :=
