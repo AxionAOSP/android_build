@@ -7289,6 +7289,14 @@ _symbols_zip_modules := $(call product-installed-modules,$(INTERNAL_PRODUCT))
 _symbols_zip_modules_symbols_files := $(foreach m,$(_symbols_zip_modules),$(ALL_MODULES.$(m).SYMBOLIC_OUTPUT_PATH))
 _symbols_zip_modules_mapping_files := $(foreach m,$(_symbols_zip_modules),$(ALL_MODULES.$(m).ELF_SYMBOL_MAPPING_PATH))
 
+.PHONY: symbols-files
+symbols-files: $(_symbols_zip_modules_symbols_files)
+droidcore-unbundled: symbols-files
+
+.PHONY: symbols-mappings
+symbols-mappings: $(_symbols_zip_modules_mapping_files)
+droidcore-unbundled: symbols-mappings
+
 $(SYMBOLS_ZIP): PRIVATE_SYMBOLS_MODULES_FILES := $(_symbols_zip_modules_symbols_files)
 $(SYMBOLS_ZIP): PRIVATE_SYMBOLS_MODULES_MAPPING_FILES := $(_symbols_zip_modules_mapping_files)
 $(SYMBOLS_ZIP): $(SOONG_ZIP) $(SYMBOLS_MAP) $(_symbols_zip_modules_symbols_files) $(_symbols_zip_modules_mapping_files)

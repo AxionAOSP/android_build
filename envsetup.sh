@@ -273,7 +273,7 @@ function set_global_paths()
 
     # Out with the old...
     if [ -n "$ANDROID_GLOBAL_BUILD_PATHS" ] ; then
-        export PATH=${PATH/$ANDROID_GLOBAL_BUILD_PATHS/}
+        export PATH=${PATH/$ANDROID_GLOBAL_BUILD_PATHS:/}
     fi
 
     # And in with the new...

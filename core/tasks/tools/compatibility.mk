@@ -140,13 +140,13 @@ $(compatibility_zip): $(compatibility_zip_deps) | $(ADB) $(ACP)
 	cp $(PRIVATE_TOOLS) $(PRIVATE_OUT_DIR)/tools
 	$(if $(PRIVATE_DYNAMIC_CONFIG),$(hide) cp $(PRIVATE_DYNAMIC_CONFIG) $(PRIVATE_OUT_DIR)/testcases/$(PRIVATE_SUITE_NAME).dynamic)
 	find $(PRIVATE_RESOURCES) | sort >$@.list
-	$(SOONG_ZIP) -d -o $@.tmp -C $(dir $@) -l $@.list -sha256
-	$(MERGE_ZIPS) $@ $@.tmp $(PRIVATE_JDK)
+	$(SOONG_ZIP) -o $@.tmp -C $(dir $@) -l $@.list -sha256
+	$(MERGE_ZIPS) -s $@ $@.tmp $(PRIVATE_JDK)
 	rm -f $@.tmp
 # Build a list of tests
 	rm -f $(PRIVATE_tests_list)
 	$(hide) grep -e .*\\.config$$ $@.list | sed s%$(PRIVATE_OUT_DIR)/testcases/%%g > $(PRIVATE_tests_list)
-	$(SOONG_ZIP) -d -o $(PRIVATE_tests_list_zip) -j -f $(PRIVATE_tests_list)
+	$(SOONG_ZIP) -o $(PRIVATE_tests_list_zip) -j -f $(PRIVATE_tests_list)
 	rm -f $(PRIVATE_tests_list)
 
 $(call declare-0p-target,$(compatibility_tests_list_zip),)

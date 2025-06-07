@@ -521,6 +521,7 @@ system_image_defaults {
     },
     build_logtags: true,
     gen_aconfig_flags_pb: true,
+    check_vintf: true,
 
     compile_multilib: "both",
 

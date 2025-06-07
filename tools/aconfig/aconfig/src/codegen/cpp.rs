@@ -567,7 +567,10 @@ namespace com::android::aconfig::test {
                     "system",
                     aconfig_storage::StorageFileType::package_map);
                 if (!package_map_file.ok()) {
+// Host doesn't have the package map file.
+#ifdef __ANDROID__
                     ALOGE("error: failed to get package map file: %s", package_map_file.error().c_str());
+#endif
                     package_exists_in_storage_ = false;
                     return;
                 }
@@ -794,7 +797,10 @@ namespace com::android::aconfig::test {
                     "system",
                     aconfig_storage::StorageFileType::package_map);
                 if (!package_map_file.ok()) {
+// Host doesn't have the package map file.
+#ifdef __ANDROID__
                     ALOGE("error: failed to get package map file: %s", package_map_file.error().c_str());
+#endif
                     package_exists_in_storage_ = false;
                     return;
                 }
@@ -1057,7 +1063,10 @@ namespace com::android::aconfig::test {
                     aconfig_storage::StorageFileType::package_map);
 
                 if (!package_map_file.ok()) {
+// Host doesn't have the package map file.
+#ifdef __ANDROID__
                     ALOGE("error: failed to get package map file: %s", package_map_file.error().c_str());
+#endif
                     package_exists_in_storage_ = false;
                     return;
                 }
