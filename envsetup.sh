@@ -1793,23 +1793,42 @@ function rbr() {
     set +m
 
     local ROOT_DIR="$(pwd)"
-    local MANIFEST_FILE="$ROOT_DIR/android/snippets/axion.xml"
+    local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
+    local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
     local TARGET_BRANCH="lineage-22.2"
-    local UPSTREAM_REMOTE="axion"
     local MAX_JOBS=12
 
-    if [[ ! -f "$MANIFEST_FILE" ]]; then
-        echo "[ERROR] Manifest file not found: $MANIFEST_FILE"
-        return 1
-    fi
+    local UPSTREAM_REMOTE="axion"
+    local UPSTREAM_DEVICES_REMOTE="axion_devices"
 
-    echo "[INFO] Parsing manifest: $MANIFEST_FILE"
+    local REBASE_AXION=true
+    local REBASE_DEVICES=true
+
+    case "$1" in
+        -m) REBASE_DEVICES=false ;;
+        -d) REBASE_AXION=false ;;
+        -a|""|*) ;;
+    esac
 
     local TMP_REPO_LIST
     TMP_REPO_LIST=$(mktemp)
-    grep '<project ' "$MANIFEST_FILE" | \
-        grep "remote=\"$UPSTREAM_REMOTE\"" | \
-        sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2/p' > "$TMP_REPO_LIST"
+
+    extract_projects_from_manifest() {
+        local manifest_file="$1"
+        local remote_name="$2"
+
+        grep '<project ' "$manifest_file" | \
+            grep "remote=\"$remote_name\"" | \
+            sed -n "s/.*path=\"\([^\"]*\\)\".*name=\"\([^\"]*\)\".*/\1|\2|$remote_name/p"
+    }
+
+    if $REBASE_AXION && [[ -f "$AXION_MANIFEST" ]]; then
+        extract_projects_from_manifest "$AXION_MANIFEST" "$UPSTREAM_REMOTE" >> "$TMP_REPO_LIST"
+    fi
+
+    if $REBASE_DEVICES && [[ -f "$ROOMSERVICE_MANIFEST" ]]; then
+        extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "$UPSTREAM_DEVICES_REMOTE" >> "$TMP_REPO_LIST"
+    fi
 
     local -a SUCCESS_REPOS=()
     local -a SKIPPED_REPOS=()
@@ -1820,8 +1839,9 @@ function rbr() {
     process_repo() {
         local REPO_PATH="$1"
         local REPO_NAME="$2"
+        local PUSH_REMOTE="$3"
 
-        echo "[INFO] Processing $REPO_PATH ($REPO_NAME)..."
+        echo "[INFO] Processing $REPO_PATH ($REPO_NAME) with remote '$PUSH_REMOTE'..."
 
         if [[ ! -d "$ROOT_DIR/$REPO_PATH" ]]; then
             echo "[WARN] Directory $REPO_PATH not found, skipping."
@@ -1844,7 +1864,8 @@ function rbr() {
             return
         fi
 
-        if ! git -C "$ROOT_DIR/$REPO_PATH" push -f --set-upstream "$UPSTREAM_REMOTE" "$TARGET_BRANCH" 2>/dev/null; then
+        echo "[INFO] Pushing to $PUSH_REMOTE/$TARGET_BRANCH..."
+        if ! git -C "$ROOT_DIR/$REPO_PATH" push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" 2>/dev/null; then
             echo "[INFO] Push failed or unnecessary for $REPO_PATH"
             echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
             return
@@ -1860,11 +1881,11 @@ function rbr() {
 
     echo "[INFO] Performing rebase operations"
 
-    while IFS='|' read -r REPO_PATH REPO_NAME; do
+    while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE; do
         PROCESSED=$((PROCESSED + 1))
         echo "Processing $PROCESSED/$TOTAL_REPOS: $REPO_PATH..."
 
-        { (process_repo "$REPO_PATH" "$REPO_NAME" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$PUSH_REMOTE" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
 
         JOBS=$((JOBS + 1))
         if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
