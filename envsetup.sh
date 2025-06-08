@@ -1724,9 +1724,8 @@ function bpx() {
     function get_devices() {
         case "$1" in
             "6") echo "raven oriole bluejay" ;;
-            "7") echo "cheetah panther lynx" ;;
-            "8") echo "husky shiba akita" ;;
-            *) echo "oriole raven bluejay panther cheetah lynx shiba husky akita" ;;
+            "7") echo "cheetah panther" ;;
+            *) echo "oriole raven bluejay panther cheetah" ;;
         esac
     }
 
