@@ -1210,16 +1210,1087 @@ unset syswrite
 unset tomlgrep
 unset treegrep
 
+function axion() {
+    local device=""
+    local build_type=""
+    local gms_variant=""
+    local gms_enabled=false
+    local vanilla_enabled=false
 
+    for arg in "$@"; do
+        case "$arg" in
+            gms)
+                if [[ "$gms_enabled" == true ]]; then
+                    echo "Error: GMS already specified."
+                    return 1
+                fi
+                if [[ "$vanilla_enabled" == true ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                gms_enabled=true
+                gms_variant="core"
+                ;;
+            pico|core)
+                if [[ "$gms_enabled" != true ]]; then
+                    echo "Error: GMS variant specified without enabling GMS."
+                    return 1
+                fi
+                gms_variant="$arg"
+                ;;
+            va|vanilla)
+                if [[ "$vanilla_enabled" == true ]]; then
+                    echo "Error: Vanilla already specified."
+                    return 1
+                fi
+                if [[ "$gms_enabled" == true ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                vanilla_enabled=true
+                ;;
+            user|userdebug|eng)
+                if [[ -n "$build_type" ]]; then
+                    echo "Error: Multiple build types specified ($build_type and $arg). Only one build type can be used."
+                    return 1
+                fi
+                build_type="$arg"
+                ;;
+            *)
+                if [[ -n "$device" ]]; then
+                    echo "Error: Multiple device names detected ($device and $arg). Please specify only one device."
+                    return 1
+                fi
+                device="$arg"
+                ;;
+        esac
+    done
+
+    if [ -z "$device" ]; then
+        if [[ -n "$TARGET_PRODUCT" ]]; then
+            device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+            echo "No argument found for device, using TARGET_PRODUCT as device: $device"
+        else
+            echo "Correct usage: axion <device_codename> [build_type] [gms [pico|core] | va]"
+            echo "Available build types: user, userdebug, eng"
+            echo "Available GMS variants: pico, core (default: core)"
+            echo "Use 'va' or 'vanilla' for a non-GMS build."
+            return 1
+        fi
+    fi
+
+    if [ -z "$build_type" ]; then
+        build_type="userdebug"
+    fi
+
+    if [[ "$gms_enabled" == true ]]; then
+        export WITH_GMS=true
+        export WITH_GMS_VARIANT="$gms_variant"
+    elif [[ "$vanilla_enabled" == true ]]; then
+        export WITH_GMS=false
+        unset WITH_GMS_VARIANT
+    else
+        export WITH_GMS=false
+        unset WITH_GMS_VARIANT
+    fi
+
+    source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
+
+    case "$build_type" in
+        user|userdebug|eng)
+            lunch lineage_"$device"-"$aosp_target_release"-"$build_type"
+        ;;
+        *)
+            echo "Error: Invalid build type '$build_type'. Available options: user, userdebug, eng"
+            return 1
+        ;;
+    esac
+    
+    ax_help
+    
+    generate_host_overrides
+}
+
+function ax_help() {
+    local BOLD="\e[1m"
+    local GREEN="\e[32m"
+    local YELLOW="\e[33m"
+    local CYAN="\e[36m"
+    local RESET="\e[0m"
+
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
+    echo -e "${BOLD}${CYAN}          BUILDING INSTRUCTIONS          ${RESET}"
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
+    echo
+    echo -e "Use ${YELLOW}axion${RESET} instead of ${YELLOW}lunch${RESET}."
+    echo
+    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [pico|core] | vanilla]${RESET}"
+    echo
+    echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
+    echo
+    echo -e "${BOLD}Build Types:${RESET}"
+    echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
+    echo -e "  ${YELLOW}-fb${RESET}  ${CYAN}Fastboot${RESET}"
+    echo -e "  ${YELLOW}-br${RESET}  ${CYAN}Brunch${RESET}"
+    echo
+    echo -e "${BOLD}Build Options:${RESET}"
+    echo -e "  ${YELLOW}-j<num>${RESET}  ${CYAN}Job count${RESET}"
+    echo -e "  ${YELLOW}user | eng | userdebug${RESET}  ${CYAN}Build variant${RESET}"
+    echo
+    echo -e "${BOLD}Defaults:${RESET}"
+    echo -e "  ${YELLOW}Job count${RESET}  ${CYAN}-j$(nproc --all)${RESET}"
+    echo -e "  ${YELLOW}Build variant${RESET}  ${CYAN}userdebug${RESET}"
+    echo -e "  ${YELLOW}Build type${RESET}  ${CYAN}m${RESET}"
+    echo -e "${BOLD}${GREEN}=========================================${RESET}"
+}
+
+function ax() {
+    if [[ "$1" == "help" ]]; then
+        ax_help
+        return 0
+    fi
+
+    local jCount=""
+    local cmd=""
+    local variant=""
+    local device=""
+    
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^-j[0-9]+$ ]]; then
+            jCount="$arg"
+        elif [[ "$arg" =~ ^-(b|fb|br)$ ]]; then
+            cmd="${arg:1}"
+        elif [[ "$arg" =~ ^(user|eng|userdebug)$ ]]; then
+            variant="$arg"
+        else
+            device="$arg"
+        fi
+    done
+
+    jCount="${jCount:--j$(nproc --all)}"
+
+    if [[ -n "$device" ]]; then
+        export TARGET_PRODUCT="lineage_$device"
+        echo "Setting target device to $device"
+    elif [[ -z "$TARGET_PRODUCT" ]]; then
+        echo "Error: No device target set. Please use 'axion' or 'lunch' to set the target device."
+        return 1
+    fi
+
+    if [[ -n "$variant" ]]; then
+        export TARGET_BUILD_VARIANT="$variant"
+        echo "Setting build variant to $variant"
+    fi
+
+    m installclean
+
+    if [[ -z "$cmd" ]]; then
+        echo "Running default 'm' build with $jCount"
+        m "$jCount"
+        return
+    fi
+
+    if [[ "$cmd" == "br" ]]; then
+        local targetDevice=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+        echo "Running brunch for device: $targetDevice with $jCount"
+        brunch "$targetDevice" "$TARGET_BUILD_VARIANT" "$jCount"
+        return
+    fi
+
+    case "$cmd" in
+        b)
+            m bacon "$jCount"
+            ;;
+        fb)
+            m updatepackage "$jCount"
+            ;;
+    esac
+}
+
+function axionSync() {
+    yes y | repo init -u https://github.com/AxionAOSP/android.git -b lineage-23.1 --git-lfs
+    repo sync --force-sync
+}
+
+# usage (buildInstallApp): biApp Launcher3QuickStep/SettingsGoogle etc
+function biApp() {
+    local package="$1"
+    if [[ "$package" == "L3" ]]; then
+        package="Launcher3QuickStep"
+    elif [[ "$package" == "SG" ]]; then
+        package="Settings"
+    fi
+
+    echo "Building package: $package"
+    if ! m "$package"; then
+        echo "Warning: Build failed for $package. Skipping installation."
+        return 1
+    fi
+
+    iApp "$package"
+}
+
+# usage (installApp): iApp Launcher3QuickStep/SettingsGoogle etc
+function iApp() {
+    local target_device
+    target_device="$(get_build_var TARGET_DEVICE)"
+    local package="$1"
+
+    if [[ "$package" == "L3" ]]; then
+        package="Launcher3QuickStep"
+    elif [[ "$package" == "SG" ]]; then
+        package="Settings"
+    fi
+
+    while true; do
+        if adb get-state 1>/dev/null 2>&1; then
+            break
+        fi
+        echo "Waiting for device..."
+        sleep 2
+    done
+
+    local apk_path
+    apk_path=$(find "out/target/product/$target_device/" \
+        \( -path "*/system_ext/*" -o -path "*/product/*" -o -path "*/system/*" \) \
+        -type f -name "$package.apk" -print -quit)
+
+    if [[ -z "$apk_path" ]]; then
+        echo "Error: APK for package '$package' not found."
+        return 1
+    fi
+
+    echo "Installing: $apk_path"
+    if ! adb install "$apk_path"; then
+        echo "Warning: Failed to install $package. Skipping."
+        return 1
+    fi
+}
+
+# Usage: biPart se|p|s|v
+function biPart() {
+    local short_partition="$1"
+
+    if ! part "$short_partition"; then
+        echo "Error occured. Aborting."
+        return 1
+    fi
+
+    if ! iPart "$short_partition"; then
+        echo "Error occured. Aborting installation"
+        return 1
+    fi
+}
+
+function part() {
+    local part="$1"
+    case "$part" in
+        se)
+            m systemextimage
+            ;;
+        p)
+            m productimage
+            ;;
+        s)
+            m systemimage
+            ;;
+        v)
+            m vendorimage
+            ;;
+        *)
+            echo "Error: Unknown partition '$part'. Valid options: se, p, s, v."
+            return 1
+            ;;
+    esac
+}
+
+function iPart() {
+    local part="$1"
+    local partition
+    case "$part" in
+        se)
+            partition="system_ext"
+            ;;
+        p)
+            partition="product"
+            ;;
+        s)
+            partition="system"
+            ;;
+        v)
+            partition="vendor"
+            ;;
+        *)
+            echo "Error: Unknown part partition '$part'. Valid options: se, p, s, v."
+            return 1
+            ;;
+    esac
+
+    local target_device
+    target_device="$(get_build_var TARGET_DEVICE)"
+    local img_path="out/target/product/$target_device/$partition.img"
+
+    if [[ ! -f "$img_path" ]]; then
+        echo "Error: Image for partition '$partition' not found at $img_path."
+        return 1
+    fi
+
+    echo "Waiting for adb device..."
+    until adb get-state 1>/dev/null 2>&1; do
+        sleep 2
+    done
+    echo "Device detected!"
+
+    echo "Flashing $partition image: $img_path"
+    adb reboot fastboot
+
+    echo "Waiting for fastboot device..."
+    until fastboot devices | grep -q '^[a-zA-Z0-9]\+'; do
+        sleep 2
+    done
+    echo "Fastboot device detected!"
+
+    if fastboot flash "$partition" "$img_path"; then
+        fastboot reboot
+    else
+        echo "Error: fastboot flash failed for $partition."
+        return 1
+    fi
+}
+
+function setup_ccache() {
+    if [ -z "${CCACHE_EXEC}" ]; then
+        if command -v ccache &>/dev/null; then
+            export USE_CCACHE=1
+            export CCACHE_EXEC=$(command -v ccache)
+            [ -z "${CCACHE_DIR}" ] && export CCACHE_DIR="$HOME/.ccache"
+            echo "ccache directory found, CCACHE_DIR set to: $CCACHE_DIR" >&2
+
+            CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-40G}"
+            DIRECT_MODE="${DIRECT_MODE:-false}"
+
+            $CCACHE_EXEC -o compression=true -o direct_mode="${DIRECT_MODE}" -M "${CCACHE_MAXSIZE}" \
+                && echo "ccache enabled, CCACHE_EXEC set to: $CCACHE_EXEC, CCACHE_MAXSIZE set to: $CCACHE_MAXSIZE, direct_mode set to: $DIRECT_MODE" >&2 \
+                || echo "Warning: Could not set cache size limit. Please check ccache configuration." >&2
+
+            if [ -d "$CCACHE_DIR" ]; then
+                CURRENT_CCACHE_SIZE_BYTES=$(du -sb "$CCACHE_DIR" 2>/dev/null | awk '{print $1}')
+                CURRENT_CCACHE_SIZE_GB=$(echo "$CURRENT_CCACHE_SIZE_BYTES" | awk '{printf "%.2f\n", $1 / 1000 / 1000 / 1000}')
+
+                if [ -n "$CURRENT_CCACHE_SIZE_GB" ]; then
+                    echo "Current ccache size is: ${CURRENT_CCACHE_SIZE_GB} GB" >&2
+                else
+                    echo "No cached files in ccache." >&2
+                fi
+            else
+                echo "Warning: ccache directory does not exist: $CCACHE_DIR" >&2
+            fi
+        else
+            echo "Error: ccache not found. Please install ccache." >&2
+        fi
+    fi
+}
+
+function generate_keys() {
+    local subject="/C=US/ST=California/L=Los Angeles/O=AxionOS/OU=AxionOS/CN=AxionOS"
+    echo "Subject string: $subject"
+    local key_names=("${@}")
+    if [ -d "$ANDROID_KEY_PATH" ]; then
+        echo "Cleaning up $ANDROID_KEY_PATH while preserving .git..."
+        find "$ANDROID_KEY_PATH" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+    fi
+    mkdir -p "$ANDROID_KEY_PATH"
+    for key_name in "${key_names[@]}"; do
+        if [ -f "$ANDROID_KEY_PATH/$key_name.pk8" ] || [ -f "$ANDROID_KEY_PATH/$key_name.x509.pem" ]; then
+            echo "Deleting existing files for $key_name..."
+            rm -f "$ANDROID_KEY_PATH/$key_name.pk8" "$ANDROID_KEY_PATH/$key_name.x509.pem"
+        fi
+        echo "Executing make_key for $key_name without password..."
+        echo "" | ./development/tools/make_key "$ANDROID_KEY_PATH/$key_name" "$subject"
+    done
+}
+
+function show_help() {
+    echo "Usage: gk [option]"
+    echo ""
+    echo "Options:"
+    echo "  -s          Generate keys for simple signing"
+    echo "  -h, --help  Show generate keys instructions"
+}
+
+function gk() {
+    local mode="$1"
+    case "$mode" in
+        -h|--help)
+            show_help
+            return 0
+            ;;
+        -s)
+            local key_names=("nfc" "bluetooth" "media" "networkstack" "platform" "releasekey" "sdk_sandbox" "shared" "testkey" "verifiedboot")
+            ;;
+        *)
+            show_help
+            return 0
+            ;;
+    esac
+    echo "Generating keys..."
+    generate_keys "${key_names[@]}"
+    echo "PRODUCT_DEFAULT_DEV_CERTIFICATE := vendor/lineage-priv/keys/releasekey" > vendor/lineage-priv/keys/keys.mk
+    bazel_build_content="filegroup(
+    name = \"android_certificate_directory\",
+    srcs = glob([
+        \"*.pk8\",
+        \"*.pem\",
+    ]),
+    visibility = [\"//visibility:public\"],
+)"
+    echo "$bazel_build_content" > vendor/lineage-priv/keys/BUILD.bazel
+    if [ "$mode" == "-f" ]; then
+        local subject="/C=US/ST=California/L=Los Angeles/O=AxionOS/OU=AxionOS/CN=AxionOS"
+        cp ./development/tools/make_key $ANDROID_KEY_PATH/
+        sed -i 's|2048|4096|g' $ANDROID_KEY_PATH/make_key
+        for apex in com.android.adbd com.android.adservices com.android.adservices.api com.android.appsearch com.android.art com.android.bluetooth com.android.btservices com.android.cellbroadcast com.android.compos com.android.configinfrastructure com.android.connectivity.resources com.android.conscrypt com.android.devicelock com.android.extservices com.android.graphics.pdf com.android.hardware.biometrics.face.virtual com.android.hardware.biometrics.fingerprint.virtual com.android.hardware.boot com.android.hardware.cas com.android.hardware.wifi com.android.healthfitness com.android.hotspot2.osulogin com.android.i18n com.android.ipsec com.android.media com.android.media.swcodec com.android.mediaprovider com.android.nearby.halfsheet com.android.networkstack.tethering com.android.neuralnetworks com.android.ondevicepersonalization com.android.os.statsd com.android.permission com.android.resolv com.android.rkpd com.android.runtime com.android.safetycenter.resources com.android.scheduling com.android.sdkext com.android.support.apexer com.android.telephony com.android.telephonymodules com.android.tethering com.android.tzdata com.android.uwb com.android.uwb.resources com.android.virt com.android.vndk.current com.android.vndk.current.on_vendor com.android.wifi com.android.wifi.dialog com.android.wifi.resources com.google.pixel.camera.hal com.google.pixel.vibrator.hal com.qorvo.uwb; do
+            if [ -f "$ANDROID_KEY_PATH/$apex.pk8" ] || [ -f "$ANDROID_KEY_PATH/$apex.x509.pem" ]; then
+                echo "Deleting existing files for $apex..."
+                rm -f "$ANDROID_KEY_PATH/$apex.pk8" "$ANDROID_KEY_PATH/$apex.x509.pem"
+            fi
+            echo "" | $ANDROID_KEY_PATH/make_key $ANDROID_KEY_PATH/$apex "$subject"
+            openssl pkcs8 -in $ANDROID_KEY_PATH/$apex.pk8 -inform DER -nocrypt -out $ANDROID_KEY_PATH/$apex.pem
+        done
+    fi
+}
+
+function remove_keys() {
+    local key_mk="vendor/lineage-priv/keys/keys.mk"
+    local build_bazel="vendor/lineage-priv/keys/BUILD.bazel"
+    if [ -f "$key_mk" ]; then
+        echo "Removing $key_mk..."
+        sudo rm -f "$key_mk"
+    else
+        echo "$key_mk does not exist."
+    fi
+    if [ -f "$build_bazel" ]; then
+        echo "Removing $build_bazel..."
+        sudo rm -f "$build_bazel"
+    else
+        echo "$build_bazel does not exist."
+    fi
+}
+
+function rcleanup() {
+    echo "Generating list of current repositories from the manifest files..."
+
+    # Initialize current_repos.txt
+    > current_repos.txt
+
+    # Aggregate project names from manifest files in .repo/manifests
+    for manifest in .repo/manifests/default.xml .repo/manifests/snippets/lineage.xml .repo/manifests/snippets/pixel.xml .repo/manifests/snippets/axion.xml;
+    do
+        if [ -f "$manifest" ]; then
+            grep 'name=' "$manifest" | sed -e 's/.*name="\([^"]*\)".*/\1/' >> current_repos.txt
+        fi
+    done
+
+    # Append project names from .repo/local_manifests/*.xml if they exist
+    if ls .repo/local_manifests/*.xml 1> /dev/null 2>&1; then
+        grep 'name=' .repo/local_manifests/*.xml | sed -e 's/.*name="\([^"]*\)".*/\1/' >> current_repos.txt
+    fi
+
+    echo "Navigating to .repo/project-objects directory..."
+    cd .repo/project-objects || { echo "Failed to navigate to .repo/project-objects"; exit 1; }
+
+    echo "Listing all repositories in .repo/project-objects..."
+    find . -type d -name "*.git" | sed 's|^\./||' | sed 's|\.git$||' > all_repos.txt
+
+    echo "Identifying old repositories..."
+    old_repos=$(comm -23 <(sort all_repos.txt) <(sort ../../current_repos.txt))
+
+    if [ -z "$old_repos" ]; then
+        echo "No old repositories to remove."
+        rm ../../current_repos.txt
+        rm all_repos.txt
+        croot
+        return
+    fi
+
+    echo "The following repositories will be removed:"
+    echo "$old_repos"
+
+    read -p "Do you want to proceed with the removal? (y/n): " confirm
+    if [[ "$confirm" != "y" ]]; then
+        echo "Removal cancelled."
+        rm ../../current_repos.txt
+        rm all_repos.txt
+        croot
+        return
+    fi
+
+    echo "Removing old repositories..."
+    for repo in $old_repos; do
+        echo "Removing old repository: $repo"
+        rm -rf "$repo.git"
+    done
+
+    echo "Removing temporary pack files..."
+    find . -type f -name "tmp_pack_*" -exec rm -f {} +
+
+    echo "Performing garbage collection on all repositories..."
+    repo forall -c 'git gc --prune=now --aggressive'
+
+    echo "Cleaning up temporary files..."
+    rm ../../current_repos.txt
+    rm all_repos.txt
+
+    echo "Cleanup complete."
+
+    croot
+}
+
+function setup_keys() {
+    if [[ ! -d vendor/lineage-priv/keys ]]; then
+        gk -s
+    fi
+}
+
+function generate_host_overrides() {
+    export BUILD_USERNAME=android-build
+    HEX=$(openssl rand -hex 8)
+    ALPHA=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 4 | head -n 1)
+    export BUILD_HOSTNAME="r-${HEX}-${ALPHA}"
+    echo "BUILD_USERNAME=$BUILD_USERNAME"
+    echo "BUILD_HOSTNAME=$BUILD_HOSTNAME"
+}
+
+function cpo() {
+    local device="$1"
+    local output_dir="out/target/product/$device"
+    local base_dest_dir="$HOME/ROM"
+
+    local latest_zip
+    latest_zip=$(ls -t "$output_dir"/*.zip 2>/dev/null | head -n 1)
+
+    if [[ -z "$latest_zip" ]]; then
+        echo "No zip file found in $output_dir."
+        return 1
+    fi
+
+    mkdir -p "$base_dest_dir"
+    mv "$latest_zip" "$base_dest_dir" && echo "Moved $(basename "$latest_zip") to $base_dest_dir"
+
+    if [[ "$latest_zip" == *GMS* ]]; then
+        local dest_dir="$base_dest_dir/GMS"
+        mkdir -p "$dest_dir"
+        mv "$output_dir/GMS/$device.json" "$dest_dir" && echo "Moved $device.json from GMS folder"
+    elif [[ "$latest_zip" == *VANILLA* ]]; then
+        local dest_dir="$base_dest_dir/VANILLA"
+        mkdir -p "$dest_dir"
+        mv "$output_dir/VANILLA/$device.json" "$dest_dir" && echo "Moved $device.json from VANILLA folder"
+    else
+        echo "Neither GMS nor VANILLA detected in zip name."
+    fi
+}
+
+function bpx() {
+    declare -A PIXEL_SERIES=(
+        [6]="raven oriole bluejay"
+        [7]="cheetah panther lynx"
+        [8]="husky shiba akita"
+    )
+
+    run_step() {
+        if ! "$@"; then
+            echo "❌ ERROR: '$*' failed. Aborting all builds." >&2
+            return 255
+        fi
+    }
+
+    get_all_devices() {
+        local all=""
+        for s in "${!PIXEL_SERIES[@]}"; do
+            all+=" ${PIXEL_SERIES[$s]}"
+        done
+        echo "$all"
+    }
+
+    local series="${1:-all}"
+    local base_dir="$HOME/ROM"
+
+    local devices=()
+    if [[ "$series" == "all" ]]; then
+        devices=($(get_all_devices))
+    elif [[ -n "${PIXEL_SERIES[$series]}" ]]; then
+        devices=(${PIXEL_SERIES[$series]})
+    else
+        echo "Unknown series '$series'. Valid: ${!PIXEL_SERIES[@]} or 'all'"
+        return 1
+    fi
+
+    for device in "${devices[@]}"; do
+        local vanilla_matches=($(compgen -G "$base_dir/axion-*VANILLA-$device.zip"))
+        local gms_matches=($(compgen -G "$base_dir/axion-*GMS-$device.zip"))
+
+        # VANILLA
+        if (( ${#vanilla_matches[@]} == 0 )); then
+            echo "[${device}] VANILLA missing — building..."
+            run_step axion "$device" va       || return $?
+            run_step ax -br "$device"         || return $?
+            run_step cpo "$device"            || return $?
+        else
+            echo "[${device}] VANILLA exists — skipping."
+        fi
+
+        # GMS
+        if (( ${#gms_matches[@]} == 0 )); then
+            echo "[${device}] GMS missing — building..."
+            run_step axion "$device" gms      || return $?
+            run_step ax -br "$device"         || return $?
+            run_step cpo "$device"            || return $?
+        else
+            echo "[${device}] GMS exists — skipping."
+        fi
+
+        echo
+    done
+}
+
+function initPixelRoomService() {
+    local ROOM_DIR="$(pwd)"
+    local MANIFESTS_DIR="$ROOM_DIR/.repo/local_manifests"
+    local ROOM_URL="https://raw.githubusercontent.com/AxionAOSP/roomservice_pixels/refs/heads/lineage-22.1/roomservice.xml"
+    local OUTPUT_FILE="$MANIFESTS_DIR/roomservice.xml"
+
+    echo "[*] Starting pixel room service..."
+
+    if [ ! -d "$MANIFESTS_DIR" ]; then
+        mkdir -p "$MANIFESTS_DIR" || { echo "[!] Failed to create directory."; exit 1; }
+    fi
+
+    if [ -f "$OUTPUT_FILE" ]; then
+        echo "[*] Backing up existing roomservice.xml"
+        cp "$OUTPUT_FILE" "$OUTPUT_FILE.bak" || { echo "[!] Backup failed."; exit 1; }
+    fi
+
+    echo "[*] Downloading roomservice.xml..."
+    if curl -fsSL "$ROOM_URL" -o "$OUTPUT_FILE"; then
+        echo "[✓] roomservice.xml successfully written to $OUTPUT_FILE"
+    else
+        echo "[!] Failed to fetch roomservice.xml"
+        exit 1
+    fi
+}
+
+function rbr() {
+    set +m
+
+    local ROOT_DIR="$(pwd)"
+    local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
+    local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
+    local TARGET_BRANCH="lineage-23.0"
+    local MAX_JOBS=12
+
+    local UPSTREAM_REMOTE="axion"
+    local UPSTREAM_DEVICES_REMOTE="axion_devices"
+
+    local REBASE_AXION=true
+    local REBASE_DEVICES=true
+
+    local -a BLACKLIST=("frameworks/base")
+
+    case "$1" in
+        -m) REBASE_DEVICES=false ;;
+        -d) REBASE_AXION=false ;;
+        -a|""|*) ;;
+    esac
+
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+
+    extract_projects_from_manifest() {
+        local manifest_file="$1"
+        local remote_name="$2"
+
+        grep '<project ' "$manifest_file" | \
+            grep "remote=\"$remote_name\"" | \
+            sed -n "s/.*path=\"\([^\"]*\\)\".*name=\"\([^\"]*\)\".*/\1|\2|$remote_name/p"
+    }
+
+    if $REBASE_AXION && [[ -f "$AXION_MANIFEST" ]]; then
+        extract_projects_from_manifest "$AXION_MANIFEST" "$UPSTREAM_REMOTE" >> "$TMP_REPO_LIST"
+    fi
+
+    if $REBASE_DEVICES && [[ -f "$ROOMSERVICE_MANIFEST" ]]; then
+        extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "$UPSTREAM_DEVICES_REMOTE" >> "$TMP_REPO_LIST"
+    fi
+
+    local -a SUCCESS_REPOS=()
+    local -a SKIPPED_REPOS=()
+    local -a FAILED_REPOS=()
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
+
+    is_blacklisted() {
+        local repo_path="$1"
+        for blocked in "${BLACKLIST[@]}"; do
+            [[ "$repo_path" == "$blocked" ]] && return 0
+        done
+        return 1
+    }
+
+    process_repo() {
+        local REPO_PATH="$1"
+        local REPO_NAME="$2"
+        local PUSH_REMOTE="$3"
+
+        echo "[INFO] Processing $REPO_PATH ($REPO_NAME) with remote '$PUSH_REMOTE'..."
+
+        if [[ ! -d "$ROOT_DIR/$REPO_PATH" ]]; then
+            echo "[WARN] Directory $REPO_PATH not found, skipping."
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        cd "$ROOT_DIR/$REPO_PATH" || return
+
+        if is_blacklisted "$REPO_PATH"; then
+            echo "[INFO] Blacklisted repo: $REPO_PATH. Cherry-picking latest changes."
+
+            git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" >/dev/null 2>&1 || {
+                echo "[WARN] Failed to fetch LOS for $REPO_PATH."
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            local commits skipped=0
+            commits=$(git log --reverse -n 10 --format='%H')
+
+            for commit in $commits; do
+                if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
+                    if git log FETCH_HEAD..HEAD --oneline | grep -q "$(git log -1 --format='%s' "$commit")"; then
+                        echo "[INFO] Commit already applied, skipping."
+                        git cherry-pick --skip >/dev/null 2>&1 || true
+                        skipped=$((skipped + 1))
+                    else
+                        echo "[ERROR] Conflict during cherry-pick for $commit."
+                        git cherry-pick --abort >/dev/null 2>&1
+                        echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                        return
+                    fi
+                fi
+            done
+
+            echo "[OK] Cherry-picking latest changes success for $REPO_PATH (skipped $skipped commits)."
+            echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        if [[ "$PUSH_REMOTE" == "$UPSTREAM_DEVICES_REMOTE" ]]; then
+            echo "[INFO] Device repo: $REPO_PATH. Backing up local commits."
+
+            git fetch "$PUSH_REMOTE" "$TARGET_BRANCH" || {
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            local backup_branch="backup_$(date +%s)"
+            git branch "$backup_branch" >/dev/null 2>&1 || true
+
+            git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" || {
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            git reset --hard FETCH_HEAD >/dev/null 2>&1
+
+            local commits
+            commits=$(git log --reverse "$backup_branch" --not FETCH_HEAD --format='%H')
+            for commit in $commits; do
+                if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
+                    echo "[ERROR] Cherry-pick conflict on $REPO_PATH."
+                    git cherry-pick --abort >/dev/null 2>&1
+                    echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                    return
+                fi
+            done
+
+            echo "[OK] Device repo rebased with local commits: $REPO_PATH"
+            git push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" >/dev/null 2>&1 || true
+            echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[INFO] Fetching from $PUSH_REMOTE..."
+        git fetch "$PUSH_REMOTE" "$TARGET_BRANCH" || {
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        }
+
+        echo "[INFO] Rebasing onto $PUSH_REMOTE/$TARGET_BRANCH..."
+        if ! git rebase FETCH_HEAD 2>/dev/null; then
+            git rebase --abort >/dev/null 2>&1
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[INFO] Fetching from LineageOS/$REPO_NAME..."
+        git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" || {
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        }
+
+        echo "[INFO] Rebasing onto LineageOS/$TARGET_BRANCH..."
+        if ! git rebase FETCH_HEAD 2>/dev/null; then
+            git rebase --abort >/dev/null 2>&1
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[INFO] Pushing to $PUSH_REMOTE/$TARGET_BRANCH..."
+        git push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" >/dev/null 2>&1 || true
+        echo "[OK] Successfully rebased and pushed: $REPO_PATH"
+        echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+    }
+
+    TOTAL_REPOS=$(wc -l < "$TMP_REPO_LIST")
+    PROCESSED=0
+    JOBS=0
+
+    echo "[INFO] Performing rebase operations"
+
+    while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE; do
+        PROCESSED=$((PROCESSED + 1))
+        echo "Processing $PROCESSED/$TOTAL_REPOS: $REPO_PATH..."
+
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$PUSH_REMOTE" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+
+        JOBS=$((JOBS + 1))
+        if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
+            wait -n
+            JOBS=$((JOBS - 1))
+        fi
+    done < "$TMP_REPO_LIST"
+
+    wait
+
+    for STATUS_FILE in "$TMP_DIR"/*.status; do
+        [[ ! -f "$STATUS_FILE" ]] && continue
+        RESULT=$(cut -d' ' -f1 "$STATUS_FILE")
+        REPO=$(cut -d' ' -f2- "$STATUS_FILE")
+        case "$RESULT" in
+            SUCCESS) SUCCESS_REPOS+=("$REPO") ;;
+            SKIPPED) SKIPPED_REPOS+=("$REPO") ;;
+            FAILED)  FAILED_REPOS+=("$REPO") ;;
+        esac
+    done
+
+    rm -rf "$TMP_REPO_LIST" "$TMP_DIR"
+
+    echo ""
+    echo "[DONE] All repositories processed."
+    echo ""
+    echo "===== SUMMARY ====="
+    echo "Successful: ${#SUCCESS_REPOS[@]}"
+    echo "Failed:     ${#FAILED_REPOS[@]}"
+    echo "Skipped:    ${#SKIPPED_REPOS[@]}"
+
+    if [[ ${#FAILED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Failed Repos:"
+        printf ' - %s\n' "${FAILED_REPOS[@]}"
+    fi
+
+    if [[ ${#SKIPPED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped Repos:"
+        printf ' - %s\n' "${SKIPPED_REPOS[@]}"
+    fi
+}
+
+function writeFlag() {
+    local key="$1"
+    local value="$2"
+
+    mkdir -p "$(dirname "$AX_FLAGS_FILE")"
+
+    if [ ! -f "$AX_FLAGS_FILE" ]; then
+        echo "# Auto-generated flag overrides" > "$AX_FLAGS_FILE"
+        echo "# Do not edit manually" >> "$AX_FLAGS_FILE"
+        echo >> "$AX_FLAGS_FILE"
+        echo "TARGET_AX_FLAGS :=" >> "$AX_FLAGS_FILE"
+        echo >> "$AX_FLAGS_FILE"
+    fi
+
+    if [ "$key" = "TARGET_AX_FLAGS" ]; then
+        if ! grep -q "TARGET_AX_FLAGS :=.*\b${value}\b" "$AX_FLAGS_FILE"; then
+            sed -i "s|^TARGET_AX_FLAGS :=.*|& ${value}|" "$AX_FLAGS_FILE"
+        fi
+        echo "Added '$value' to TARGET_AX_FLAGS"
+    else
+        if grep -q "^${key} :=" "$AX_FLAGS_FILE"; then
+            sed -i "s|^${key} :=.*|${key} := ${value}|" "$AX_FLAGS_FILE"
+        else
+            echo "${key} := ${value}" >> "$AX_FLAGS_FILE"
+        fi
+        echo "Set '$key' = '$value'"
+    fi
+}
+
+function clearFlags() {
+    if [ -f "$AX_FLAGS_FILE" ]; then
+        rm -f "$AX_FLAGS_FILE"
+        echo "flags.mk deleted"
+    else
+        echo "flags.mk does not exist"
+    fi
+}
+
+function removeFlag() {
+    local key="$1"
+
+    if [ ! -f "$AX_FLAGS_FILE" ]; then
+        echo "flags.mk does not exist"
+        return 1
+    fi
+
+    if [ "$key" = "TARGET_AX_FLAGS" ]; then
+        echo "ERROR: removeFlag requires a value in TARGET_AX_FLAGS, not the variable name itself"
+        return 1
+    fi
+
+    if grep -q "^${key} :=" "$AX_FLAGS_FILE"; then
+        sed -i "/^${key} :=/d" "$AX_FLAGS_FILE"
+        echo "Removed variable '$key'"
+        return 0
+    fi
+
+    if grep -q "TARGET_AX_FLAGS :=.*\b${key}\b" "$AX_FLAGS_FILE"; then
+        sed -i "s/\b${key}\b//g" "$AX_FLAGS_FILE"
+        sed -i "s/  / /g" "$AX_FLAGS_FILE"
+        sed -i "s/ *$//" "$AX_FLAGS_FILE"
+        echo "Removed '$key' from TARGET_AX_FLAGS"
+        return 0
+    fi
+
+    echo "'$key' not found"
+}
+
+function profileCore() {
+    echo "[*] Waiting for adb device..."
+    adb wait-for-device
+    if [ $? -ne 0 ]; then
+        echo "[!] No device detected."
+        return 1
+    fi
+
+    local timestamp_folder=$(date +%Y%m%d_%H%M)
+    local timestamp_file=$(date +%Y%m%d_%H%M%S)
+
+    local hprof_out="out/profile/hprof/${timestamp_folder}"
+    mkdir -p "${hprof_out}"
+
+    echo "[*] Dumping heaps on device..."
+    adb shell "
+        for p in system_server com.android.systemui com.android.launcher3; do
+            pid=\$(pidof \$p);
+            if [ \"\$pid\" ]; then
+                echo \"Dumping heap for \$p (\$pid)...\";
+                am dumpheap \$pid /data/local/tmp/${timestamp_file}_\${p}.hprof;
+            else
+                echo \"Skipping \$p (not running)\";
+            fi;
+        done
+    "
+
+    echo "[*] Pulling results to ${hprof_out}..."
+    for p in system_server com.android.systemui com.android.launcher3; do
+        adb pull "/data/local/tmp/${timestamp_file}_${p}.hprof" "${hprof_out}/" 2>/dev/null
+    done
+
+    echo "[*] Done."
+    echo "Output located in: ${hprof_out}"
+}
+
+function profilePerfetto() {
+    echo "[*] Waiting for adb device..."
+    adb wait-for-device
+    if [ "$(adb get-state)" != "device" ]; then
+        echo "[!] No device detected."
+        return 1
+    fi
+
+    local timestamp_folder=$(date +%Y%m%d_%H%M)
+    local timestamp_file=$(date +%Y%m%d_%H%M%S)
+    local perfetto_out="out/profile/perfetto/${timestamp_folder}"
+    mkdir -p "${perfetto_out}"
+    cat "${ANDROID_BUILD_TOP}/build/make/tools/config.pbtx" | \
+        adb shell perfetto -c - --txt -o "/data/misc/perfetto-traces/${timestamp_file}_trace.pftrace"
+
+    adb pull "/data/misc/perfetto-traces/${timestamp_file}_trace.pftrace" "${perfetto_out}/" >/dev/null
+    echo "[*] Trace saved to ${perfetto_out}/${timestamp_file}_trace.pftrace"
+}
+
+function update_default_wallpaper() {
+    if [ "$#" -ne 2 ]; then
+        echo "Usage: update_default_wallpaper <image_file> <revision>"
+        return 1
+    fi
+
+    local input_image="$1"
+    local revision="$2"
+    local tmp_webp="${PWD}/default_wallpaper.webp"
+
+    echo "Converting input image to high-quality WebP..."
+    cwebp -q 100 "$input_image" -o "$tmp_webp" >/dev/null 2>&1 || { echo "Failed to convert image"; return 1; }
+
+    declare -A drawable_sizes=(
+        ["drawable-hdpi"]="1080x1080"
+        ["drawable-nodpi"]="960x960"
+        ["drawable-sw600dp-nodpi"]="1920x1920"
+        ["drawable-sw720dp-nodpi"]="1920x1920"
+        ["drawable-xhdpi"]="1440x1440"
+        ["drawable-xxhdpi"]="1920x1920"
+        ["drawable-xxxhdpi"]="2560x2560"
+    )
+
+    echo "Resizing and updating wallpapers for all drawable densities..."
+    for dir in "${!drawable_sizes[@]}"; do
+        local target_dir="${ANDROID_BUILD_TOP}/vendor/lineage/overlay/common/frameworks/base/core/res/res/$dir"
+        local dim="${drawable_sizes[$dir]}"
+        local target="$target_dir/default_wallpaper.webp"
+
+        rm -f "$target_dir/default_wallpaper."* >/dev/null 2>&1
+
+        convert "$tmp_webp" -resize "$dim" "$target" >/dev/null 2>&1
+
+        echo " -> $dir updated ($dim)"
+    done
+
+    rm -f "$tmp_webp" >/dev/null 2>&1
+
+    echo "Committing updated wallpapers..."
+    cd "${ANDROID_BUILD_TOP}/vendor/lineage" >/dev/null 2>&1 || return 1
+    git add . >/dev/null 2>&1
+    git commit -m "[axion_${revision}] updating default wallpaper" -s >/dev/null 2>&1
+
+    cd "${ANDROID_BUILD_TOP}" >/dev/null 2>&1 || return 1
+
+    echo "Wallpaper update complete."
+}
+
+setup_keys
+setup_ccache
 validate_current_shell
 set_global_paths
 source_vendorsetup
 addcompletions
+ax_help
+generate_host_overrides
 
 if [[ "$USE_LEFTOVERS" -eq 1 ]]; then
   leftovers
 fi
 
 export ANDROID_BUILD_TOP=$(gettop)
+export ANDROID_KEY_PATH="$ANDROID_BUILD_TOP/vendor/lineage-priv/keys"
+export AX_FLAGS_FILE="$ANDROID_BUILD_TOP/vendor/lineage-priv/flag_overrides/flags.mk"
 
 . $ANDROID_BUILD_TOP/vendor/lineage/build/envsetup.sh
