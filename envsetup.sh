@@ -1225,8 +1225,8 @@ unset treegrep
 function axion() {
     local device=""
     local build_type=""
-    local gms_variant=""
     local gms_enabled=false
+    local core_gms=false
     local vanilla_enabled=false
 
     for arg in "$@"; do
@@ -1241,14 +1241,13 @@ function axion() {
                     return 1
                 fi
                 gms_enabled=true
-                gms_variant="core"
                 ;;
-            pico|core)
+            core)
                 if [[ "$gms_enabled" != true ]]; then
-                    echo "Error: GMS variant specified without enabling GMS."
+                    echo "Error: Core GMS variant specified without enabling GMS."
                     return 1
                 fi
-                gms_variant="$arg"
+                core_gms=true
                 ;;
             va|vanilla)
                 if [[ "$vanilla_enabled" == true ]]; then
@@ -1283,9 +1282,9 @@ function axion() {
             device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
             echo "No argument found for device, using TARGET_PRODUCT as device: $device"
         else
-            echo "Correct usage: axion <device_codename> [build_type] [gms [pico|core] | va]"
+            echo "Correct usage: axion <device_codename> [build_type] [gms [core] | va]"
             echo "Available build types: user, userdebug, eng"
-            echo "Available GMS variants: pico, core (default: core)"
+            echo "Available GMS variants: core"
             echo "Use 'va' or 'vanilla' for a non-GMS build."
             return 1
         fi
@@ -1297,13 +1296,17 @@ function axion() {
 
     if [[ "$gms_enabled" == true ]]; then
         export WITH_GMS=true
-        export WITH_GMS_VARIANT="$gms_variant"
+        if [[ "$core_gms" == true ]]; then
+            export TARGET_CORE_GMS=true
+        else
+            export TARGET_CORE_GMS=false
+        fi
     elif [[ "$vanilla_enabled" == true ]]; then
         export WITH_GMS=false
-        unset WITH_GMS_VARIANT
+        unset TARGET_CORE_GMS
     else
         export WITH_GMS=false
-        unset WITH_GMS_VARIANT
+        unset TARGET_CORE_GMS
     fi
 
     source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
@@ -1317,7 +1320,7 @@ function axion() {
             return 1
         ;;
     esac
-    
+
     ax_help
     
     generate_host_overrides
@@ -1336,7 +1339,7 @@ function ax_help() {
     echo
     echo -e "Use ${YELLOW}axion${RESET} instead of ${YELLOW}lunch${RESET}."
     echo
-    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [pico|core] | vanilla]${RESET}"
+    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [core] | vanilla]${RESET}"
     echo
     echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
     echo
@@ -1370,7 +1373,7 @@ function ax() {
     local cmd=""
     local variant=""
     local device=""
-    
+
     for arg in "$@"; do
         if [[ "$arg" =~ ^-j[0-9]+$ ]]; then
             jCount="$arg"
@@ -1488,12 +1491,12 @@ function biPart() {
     local short_partition="$1"
 
     if ! part "$short_partition"; then
-        echo "Error occured. Aborting."
+        echo "Error occurred. Aborting."
         return 1
     fi
 
     if ! iPart "$short_partition"; then
-        echo "Error occured. Aborting installation"
+        echo "Error occurred. Aborting installation"
         return 1
     fi
 }
