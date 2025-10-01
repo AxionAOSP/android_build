@@ -1239,6 +1239,8 @@ function axion() {
     esac
     
     ax_help
+    
+    generate_host_overrides
 }
 
 function ax_help() {
