@@ -1721,8 +1721,10 @@ function cpo() {
 function bpx() {
     function get_devices() {
         case "$1" in
-            "6") echo "raven oriole bluejay" ;;
+            "6") echo "raven oriole bluejay" ;; # pro, non-pro, a
             "7") echo "cheetah panther" ;;
+            "8") echo "husky shiba akita" ;;
+            "9") echo "komodo caiman tokay" ;;
             *) echo "cheetah panther raven oriole bluejay  " ;;
         esac
     }
