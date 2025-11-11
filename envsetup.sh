@@ -1812,9 +1812,7 @@ function rbr() {
     local REBASE_AXION=true
     local REBASE_DEVICES=true
 
-    local -a BLACKLIST=(
-        "frameworks/base"
-    )
+    local -a BLACKLIST=("frameworks/base")
 
     case "$1" in
         -m) REBASE_DEVICES=false ;;
@@ -1851,9 +1849,7 @@ function rbr() {
     is_blacklisted() {
         local repo_path="$1"
         for blocked in "${BLACKLIST[@]}"; do
-            if [[ "$repo_path" == "$blocked" ]]; then
-                return 0
-            fi
+            [[ "$repo_path" == "$blocked" ]] && return 0
         done
         return 1
     }
@@ -1871,28 +1867,103 @@ function rbr() {
             return
         fi
 
-        echo "[INFO] Fetching from LineageOS/$REPO_NAME..."
-        if ! git -C "$ROOT_DIR/$REPO_PATH" fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" 2>/dev/null; then
-            echo "[WARN] Branch '$TARGET_BRANCH' not found in LineageOS/$REPO_NAME, skipping."
-            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+        cd "$ROOT_DIR/$REPO_PATH" || return
+
+        if is_blacklisted "$REPO_PATH"; then
+            echo "[INFO] Blacklisted repo: $REPO_PATH. Cherry-picking latest changes."
+
+            git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" >/dev/null 2>&1 || {
+                echo "[WARN] Failed to fetch LOS for $REPO_PATH."
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            local commits skipped=0
+            commits=$(git log --reverse -n 10 --format='%H')
+
+            for commit in $commits; do
+                if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
+                    if git log FETCH_HEAD..HEAD --oneline | grep -q "$(git log -1 --format='%s' "$commit")"; then
+                        echo "[INFO] Commit already applied, skipping."
+                        git cherry-pick --skip >/dev/null 2>&1 || true
+                        skipped=$((skipped + 1))
+                    else
+                        echo "[ERROR] Conflict during cherry-pick for $commit."
+                        git cherry-pick --abort >/dev/null 2>&1
+                        echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                        return
+                    fi
+                fi
+            done
+
+            echo "[OK] Cherry-picking latest changes success for $REPO_PATH (skipped $skipped commits)."
+            echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
             return
         fi
 
+        if [[ "$PUSH_REMOTE" == "$UPSTREAM_DEVICES_REMOTE" ]]; then
+            echo "[INFO] Device repo: $REPO_PATH. Backing up local commits."
+
+            git fetch "$PUSH_REMOTE" "$TARGET_BRANCH" || {
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            local backup_branch="backup_$(date +%s)"
+            git branch "$backup_branch" >/dev/null 2>&1 || true
+
+            git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" || {
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            }
+
+            git reset --hard FETCH_HEAD >/dev/null 2>&1
+
+            local commits
+            commits=$(git log --reverse "$backup_branch" --not FETCH_HEAD --format='%H')
+            for commit in $commits; do
+                if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
+                    echo "[ERROR] Cherry-pick conflict on $REPO_PATH."
+                    git cherry-pick --abort >/dev/null 2>&1
+                    echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                    return
+                fi
+            done
+
+            echo "[OK] Device repo rebased with local commits: $REPO_PATH"
+            git push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" >/dev/null 2>&1 || true
+            echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[INFO] Fetching from $PUSH_REMOTE..."
+        git fetch "$PUSH_REMOTE" "$TARGET_BRANCH" || {
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        }
+
+        echo "[INFO] Rebasing onto $PUSH_REMOTE/$TARGET_BRANCH..."
+        if ! git rebase FETCH_HEAD 2>/dev/null; then
+            git rebase --abort >/dev/null 2>&1
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[INFO] Fetching from LineageOS/$REPO_NAME..."
+        git fetch "https://github.com/LineageOS/$REPO_NAME" "$TARGET_BRANCH" || {
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        }
+
         echo "[INFO] Rebasing onto LineageOS/$TARGET_BRANCH..."
-        if ! git -C "$ROOT_DIR/$REPO_PATH" rebase FETCH_HEAD 2>/dev/null; then
-            echo "[ERROR] Rebase failed or conflict in $REPO_PATH."
-            git -C "$ROOT_DIR/$REPO_PATH" rebase --abort >/dev/null 2>&1
+        if ! git rebase FETCH_HEAD 2>/dev/null; then
+            git rebase --abort >/dev/null 2>&1
             echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
             return
         fi
 
         echo "[INFO] Pushing to $PUSH_REMOTE/$TARGET_BRANCH..."
-        if ! git -C "$ROOT_DIR/$REPO_PATH" push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" 2>/dev/null; then
-            echo "[INFO] Push failed or unnecessary for $REPO_PATH"
-            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
-            return
-        fi
-
+        git push -f --set-upstream "$PUSH_REMOTE" "$TARGET_BRANCH" >/dev/null 2>&1 || true
         echo "[OK] Successfully rebased and pushed: $REPO_PATH"
         echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
     }
@@ -1904,12 +1975,6 @@ function rbr() {
     echo "[INFO] Performing rebase operations"
 
     while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE; do
-        if is_blacklisted "$REPO_PATH"; then
-            echo "[INFO] Skipping blacklisted repo: $REPO_PATH"
-            SKIPPED_REPOS+=("$REPO_PATH")
-            continue
-        fi
-
         PROCESSED=$((PROCESSED + 1))
         echo "Processing $PROCESSED/$TOTAL_REPOS: $REPO_PATH..."
 
