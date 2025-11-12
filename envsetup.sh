@@ -471,16 +471,19 @@ function _lunch_meat()
 
     local no_kernel=$(_get_build_var_cached TARGET_NO_KERNEL)
     local prebuilt_kernel=$(_get_build_var_cached TARGET_PREBUILT_KERNEL)
+    local target_kernel_device="$(_get_build_var_cached TARGET_KERNEL_DEVICE)"
     if [[ "$no_kernel" == "true" ]] || [ -n "$prebuilt_kernel" ]; then
         unset INLINE_KERNEL_BUILDING
         if [ -n "$(_get_build_var_cached TARGET_KERNEL_PLATFORM_SOURCE)" ]; then
 
             local target_kernel_source="$(_get_build_var_cached TARGET_KERNEL_PLATFORM_SOURCE)"
             local KERNEL_BUILD_TOP="${ANDROID_BUILD_TOP}/out-kernel/${target_kernel_source}"
+            local target_kernel_out_dir="${KERNEL_BUILD_TOP}/out/${target_kernel_device}"
 
-            if [ -d "${KERNEL_BUILD_TOP}/out" ] && [ "$(ls -A "${KERNEL_BUILD_TOP}/out" 2>/dev/null)" ]; then
-                echo "Skipping kernel build: ${KERNEL_BUILD_TOP}/out is not empty."
+            if [ -d "${target_kernel_out_dir}" ] && [ "$(ls -A "${target_kernel_out_dir}" 2>/dev/null)" ]; then
+                echo "Skipping kernel build: ${target_kernel_out_dir} is not empty."
             else
+                echo "building kernel: ${target_kernel_out_dir}  is empty."
                 build_kernel
             fi
         fi
