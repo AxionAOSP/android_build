@@ -2026,6 +2026,74 @@ function rbr() {
     fi
 }
 
+function writeFlag() {
+    local key="$1"
+    local value="$2"
+
+    mkdir -p "$(dirname "$AX_FLAGS_FILE")"
+
+    if [ ! -f "$AX_FLAGS_FILE" ]; then
+        echo "# Auto-generated flag overrides" > "$AX_FLAGS_FILE"
+        echo "# Do not edit manually" >> "$AX_FLAGS_FILE"
+        echo >> "$AX_FLAGS_FILE"
+        echo "TARGET_AX_FLAGS :=" >> "$AX_FLAGS_FILE"
+        echo >> "$AX_FLAGS_FILE"
+    fi
+
+    if [ "$key" = "TARGET_AX_FLAGS" ]; then
+        if ! grep -q "TARGET_AX_FLAGS :=.*\b${value}\b" "$AX_FLAGS_FILE"; then
+            sed -i "s|^TARGET_AX_FLAGS :=.*|& ${value}|" "$AX_FLAGS_FILE"
+        fi
+        echo "Added '$value' to TARGET_AX_FLAGS"
+    else
+        if grep -q "^${key} :=" "$AX_FLAGS_FILE"; then
+            sed -i "s|^${key} :=.*|${key} := ${value}|" "$AX_FLAGS_FILE"
+        else
+            echo "${key} := ${value}" >> "$AX_FLAGS_FILE"
+        fi
+        echo "Set '$key' = '$value'"
+    fi
+}
+
+function clearFlags() {
+    if [ -f "$AX_FLAGS_FILE" ]; then
+        rm -f "$AX_FLAGS_FILE"
+        echo "flags.mk deleted"
+    else
+        echo "flags.mk does not exist"
+    fi
+}
+
+function removeFlag() {
+    local key="$1"
+
+    if [ ! -f "$AX_FLAGS_FILE" ]; then
+        echo "flags.mk does not exist"
+        return 1
+    fi
+
+    if [ "$key" = "TARGET_AX_FLAGS" ]; then
+        echo "ERROR: removeFlag requires a value in TARGET_AX_FLAGS, not the variable name itself"
+        return 1
+    fi
+
+    if grep -q "^${key} :=" "$AX_FLAGS_FILE"; then
+        sed -i "/^${key} :=/d" "$AX_FLAGS_FILE"
+        echo "Removed variable '$key'"
+        return 0
+    fi
+
+    if grep -q "TARGET_AX_FLAGS :=.*\b${key}\b" "$AX_FLAGS_FILE"; then
+        sed -i "s/\b${key}\b//g" "$AX_FLAGS_FILE"
+        sed -i "s/  / /g" "$AX_FLAGS_FILE"
+        sed -i "s/ *$//" "$AX_FLAGS_FILE"
+        echo "Removed '$key' from TARGET_AX_FLAGS"
+        return 0
+    fi
+
+    echo "'$key' not found"
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
@@ -2037,5 +2105,6 @@ generate_host_overrides
 
 export ANDROID_BUILD_TOP=$(gettop)
 export ANDROID_KEY_PATH="$ANDROID_BUILD_TOP/vendor/lineage-priv/keys"
+export AX_FLAGS_FILE="$ANDROID_BUILD_TOP/vendor/lineage-priv/flag_overrides/flags.mk"
 
 . $ANDROID_BUILD_TOP/vendor/lineage/build/envsetup.sh
