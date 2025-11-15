@@ -2094,6 +2094,61 @@ function removeFlag() {
     echo "'$key' not found"
 }
 
+function profileCore() {
+    echo "[*] Waiting for adb device..."
+    adb wait-for-device
+    if [ $? -ne 0 ]; then
+        echo "[!] No device detected."
+        return 1
+    fi
+
+    local timestamp_folder=$(date +%Y%m%d_%H%M)
+    local timestamp_file=$(date +%Y%m%d_%H%M%S)
+
+    local hprof_out="out/profile/hprof/${timestamp_folder}"
+    mkdir -p "${hprof_out}"
+
+    echo "[*] Dumping heaps on device..."
+    adb shell "
+        for p in system_server com.android.systemui com.android.launcher3; do
+            pid=\$(pidof \$p);
+            if [ \"\$pid\" ]; then
+                echo \"Dumping heap for \$p (\$pid)...\";
+                am dumpheap \$pid /data/local/tmp/${timestamp_file}_\${p}.hprof;
+            else
+                echo \"Skipping \$p (not running)\";
+            fi;
+        done
+    "
+
+    echo "[*] Pulling results to ${hprof_out}..."
+    for p in system_server com.android.systemui com.android.launcher3; do
+        adb pull "/data/local/tmp/${timestamp_file}_${p}.hprof" "${hprof_out}/" 2>/dev/null
+    done
+
+    echo "[*] Done."
+    echo "Output located in: ${hprof_out}"
+}
+
+function profilePerfetto() {
+    echo "[*] Waiting for adb device..."
+    adb wait-for-device
+    if [ "$(adb get-state)" != "device" ]; then
+        echo "[!] No device detected."
+        return 1
+    fi
+
+    local timestamp_folder=$(date +%Y%m%d_%H%M)
+    local timestamp_file=$(date +%Y%m%d_%H%M%S)
+    local perfetto_out="out/profile/perfetto/${timestamp_folder}"
+    mkdir -p "${perfetto_out}"
+    cat "${ANDROID_BUILD_TOP}/build/make/tools/config.pbtx" | \
+        adb shell perfetto -c - --txt -o "/data/misc/perfetto-traces/${timestamp_file}_trace.pftrace"
+
+    adb pull "/data/misc/perfetto-traces/${timestamp_file}_trace.pftrace" "${perfetto_out}/" >/dev/null
+    echo "[*] Trace saved to ${perfetto_out}/${timestamp_file}_trace.pftrace"
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
