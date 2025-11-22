@@ -1734,43 +1734,65 @@ function cpo() {
 }
 
 function bpx() {
-    function get_devices() {
-        case "$1" in
-            "6") echo "raven oriole bluejay" ;; # pro, non-pro, a
-            "7") echo "cheetah panther" ;;
-            "8") echo "husky shiba akita" ;;
-            "9") echo "komodo caiman tokay" ;;
-            *) echo "cheetah panther raven oriole bluejay  " ;;
-        esac
+    declare -A PIXEL_SERIES=(
+        [6]="raven oriole bluejay"
+        [7]="cheetah panther lynx"
+        [8]="husky shiba akita"
+    )
+
+    run_step() {
+        if ! "$@"; then
+            echo "❌ ERROR: '$*' failed. Aborting all builds." >&2
+            return 255
+        fi
     }
 
+    get_all_devices() {
+        local all=""
+        for s in "${!PIXEL_SERIES[@]}"; do
+            all+=" ${PIXEL_SERIES[$s]}"
+        done
+        echo "$all"
+    }
+
+    local series="${1:-all}"
     local base_dir="$HOME/ROM"
-    local devices
-    devices=($(get_devices "$1"))
+
+    local devices=()
+    if [[ "$series" == "all" ]]; then
+        devices=($(get_all_devices))
+    elif [[ -n "${PIXEL_SERIES[$series]}" ]]; then
+        devices=(${PIXEL_SERIES[$series]})
+    else
+        echo "Unknown series '$series'. Valid: ${!PIXEL_SERIES[@]} or 'all'"
+        return 1
+    fi
 
     for device in "${devices[@]}"; do
-        local vanilla_zip
-        local gms_zip
-        vanilla_zip=$(ls "$base_dir"/axion-*VANILLA-"$device".zip 2>/dev/null)
-        gms_zip=$(ls "$base_dir"/axion-*GMS-"$device".zip 2>/dev/null)
+        local vanilla_matches=($(compgen -G "$base_dir/axion-*VANILLA-$device.zip"))
+        local gms_matches=($(compgen -G "$base_dir/axion-*GMS-$device.zip"))
 
-        if [[ -z "$vanilla_zip" ]]; then
-            echo "VANILLA build missing for $device. Building..."
-            axion "$device" va
-            ax -br "$device"
-            cpo "$device"
+        # VANILLA
+        if (( ${#vanilla_matches[@]} == 0 )); then
+            echo "[${device}] VANILLA missing — building..."
+            run_step axion "$device" va       || return $?
+            run_step ax -br "$device"         || return $?
+            run_step cpo "$device"            || return $?
         else
-            echo "VANILLA build already exists for $device. Skipping Vanilla..."
+            echo "[${device}] VANILLA exists — skipping."
         fi
 
-        if [[ -z "$gms_zip" ]]; then
-            echo "GMS build missing for $device. Building..."
-            axion "$device" gms
-            ax -br "$device"
-            cpo "$device"
+        # GMS
+        if (( ${#gms_matches[@]} == 0 )); then
+            echo "[${device}] GMS missing — building..."
+            run_step axion "$device" gms      || return $?
+            run_step ax -br "$device"         || return $?
+            run_step cpo "$device"            || return $?
         else
-            echo "GMS build already exists for $device. Skipping GMS..."
+            echo "[${device}] GMS exists — skipping."
         fi
+
+        echo
     done
 }
 
