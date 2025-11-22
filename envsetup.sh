@@ -2171,6 +2171,54 @@ function profilePerfetto() {
     echo "[*] Trace saved to ${perfetto_out}/${timestamp_file}_trace.pftrace"
 }
 
+function update_default_wallpaper() {
+    if [ "$#" -ne 2 ]; then
+        echo "Usage: update_default_wallpaper <image_file> <revision>"
+        return 1
+    fi
+
+    local input_image="$1"
+    local revision="$2"
+    local tmp_webp="${PWD}/default_wallpaper.webp"
+
+    echo "Converting input image to high-quality WebP..."
+    cwebp -q 100 "$input_image" -o "$tmp_webp" >/dev/null 2>&1 || { echo "Failed to convert image"; return 1; }
+
+    declare -A drawable_sizes=(
+        ["drawable-hdpi"]="1080x1080"
+        ["drawable-nodpi"]="960x960"
+        ["drawable-sw600dp-nodpi"]="1920x1920"
+        ["drawable-sw720dp-nodpi"]="1920x1920"
+        ["drawable-xhdpi"]="1440x1440"
+        ["drawable-xxhdpi"]="1920x1920"
+        ["drawable-xxxhdpi"]="2560x2560"
+    )
+
+    echo "Resizing and updating wallpapers for all drawable densities..."
+    for dir in "${!drawable_sizes[@]}"; do
+        local target_dir="${ANDROID_BUILD_TOP}/vendor/lineage/overlay/common/frameworks/base/core/res/res/$dir"
+        local dim="${drawable_sizes[$dir]}"
+        local target="$target_dir/default_wallpaper.webp"
+
+        rm -f "$target_dir/default_wallpaper."* >/dev/null 2>&1
+
+        convert "$tmp_webp" -resize "$dim" "$target" >/dev/null 2>&1
+
+        echo " -> $dir updated ($dim)"
+    done
+
+    rm -f "$tmp_webp" >/dev/null 2>&1
+
+    echo "Committing updated wallpapers..."
+    cd "${ANDROID_BUILD_TOP}/vendor/lineage" >/dev/null 2>&1 || return 1
+    git add . >/dev/null 2>&1
+    git commit -m "[axion_${revision}] updating default wallpaper" -s >/dev/null 2>&1
+
+    cd "${ANDROID_BUILD_TOP}" >/dev/null 2>&1 || return 1
+
+    echo "Wallpaper update complete."
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
