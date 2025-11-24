@@ -1905,7 +1905,7 @@ function rbr() {
     local REBASE_AXION=true
     local REBASE_DEVICES=true
 
-    local -a BLACKLIST=("frameworks/base")
+    local -a BLACKLIST=("frameworks/base vendor/official_devices")
 
     case "$1" in
         -m) REBASE_DEVICES=false ;;
@@ -2285,6 +2285,403 @@ function update_default_wallpaper() {
     cd "${ANDROID_BUILD_TOP}" >/dev/null 2>&1 || return 1
 
     echo "Wallpaper update complete."
+}
+
+function mkbranch-all() {
+    set +m
+
+    if [[ -z "$1" ]]; then
+        echo "Usage: mkbranch-all <new-branch-name>"
+        return 1
+    fi
+
+    local NEW_BRANCH="$1"
+    local ROOT_DIR="$(pwd)"
+
+    local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
+    local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
+
+    local BASE_AXION="https://github.com/AxionAOSP/"
+    local BASE_AXION_DEVICES="https://github.com/AxionAOSP-Devices/"
+
+    local MAX_JOBS=12
+
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+
+    extract_projects_from_manifest() {
+        local manifest_file="$1"
+        local remote_name="$2"
+
+        grep '<project ' "$manifest_file" | \
+            grep "remote=\"$remote_name\"" | \
+            sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2|'"$remote_name"'/p'
+    }
+
+    if [[ -f "$AXION_MANIFEST" ]]; then
+        extract_projects_from_manifest "$AXION_MANIFEST" "axion" >> "$TMP_REPO_LIST"
+    else
+        echo "[WARN] axion.xml not found"
+    fi
+
+    if [[ -f "$ROOMSERVICE_MANIFEST" ]]; then
+        extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "axion_devices" >> "$TMP_REPO_LIST"
+    else
+        echo "[WARN] roomservice.xml not found"
+    fi
+
+    local -a SUCCESS_REPOS=()
+    local -a SKIPPED_REPOS=()
+    local -a FAILED_REPOS=()
+
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
+
+    process_repo() {
+        local REPO_PATH="$1"
+        local REPO_NAME="$2"
+        local REMOTE="$3"
+
+        echo "[INFO] Processing $REPO_PATH ($REMOTE)"
+
+        local REPO_DIR="$ROOT_DIR/$REPO_PATH"
+        local TEMP_CLONE=0
+
+        local REMOTE_URL=""
+        case "$REMOTE" in
+            axion)
+                REMOTE_URL="${BASE_AXION}${REPO_NAME}.git"
+                ;;
+            axion_devices)
+                REMOTE_URL="${BASE_AXION_DEVICES}${REPO_NAME}.git"
+                ;;
+            *)
+                echo "[ERROR] Unknown remote '$REMOTE' for $REPO_PATH"
+                echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+                ;;
+        esac
+
+        if [[ ! -d "$REPO_DIR/.git" ]]; then
+            echo "[WARN] Local repo missing, cloning: $REMOTE_URL"
+
+            mkdir -p "$REPO_DIR"
+            if ! git clone --depth=1 "$REMOTE_URL" "$REPO_DIR" >/dev/null 2>&1; then
+                echo "[ERROR] Failed to clone $REMOTE_URL"
+                echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            fi
+
+            TEMP_CLONE=1
+        fi
+
+        cd "$REPO_DIR" || return
+
+        if ! git remote | grep -q "^$REMOTE$"; then
+            git remote add "$REMOTE" "$REMOTE_URL" >/dev/null 2>&1
+        fi
+
+        git fetch "$REMOTE" >/dev/null 2>&1
+
+        if git rev-parse --verify "$NEW_BRANCH" >/dev/null 2>&1; then
+            git checkout "$NEW_BRANCH" >/dev/null 2>&1
+        else
+            if ! git checkout -b "$NEW_BRANCH" >/dev/null 2>&1; then
+                echo "[ERROR] Failed to create branch for $REPO_PATH"
+                echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            fi
+        fi
+
+        if ! git push "$REMOTE" "$NEW_BRANCH":"$NEW_BRANCH" --set-upstream >/dev/null 2>&1; then
+            echo "[ERROR] Push failed for $REPO_PATH"
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        echo "[OK] Created + pushed $NEW_BRANCH for $REPO_PATH"
+        echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+    }
+
+    TOTAL_REPOS=$(wc -l < "$TMP_REPO_LIST")
+    PROCESSED=0
+    JOBS=0
+
+    echo "[INFO] Creating branch '$NEW_BRANCH' on $TOTAL_REPOS repos"
+
+    while IFS='|' read -r REPO_PATH REPO_NAME REMOTE; do
+        PROCESSED=$((PROCESSED+1))
+        echo "→ $PROCESSED/$TOTAL_REPOS: $REPO_PATH"
+
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$REMOTE" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+
+        JOBS=$((JOBS+1))
+        if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
+            wait -n
+            JOBS=$((JOBS-1))
+        fi
+    done < "$TMP_REPO_LIST"
+
+    wait
+
+    # Collect results
+    for STATUS_FILE in "$TMP_DIR"/*.status; do
+        [[ ! -f "$STATUS_FILE" ]] && continue
+        local RESULT
+        RESULT=$(cut -d' ' -f1 "$STATUS_FILE")
+        local REPO
+        REPO=$(cut -d' ' -f2- "$STATUS_FILE")
+
+        case "$RESULT" in
+            SUCCESS) SUCCESS_REPOS+=("$REPO") ;;
+            SKIPPED) SKIPPED_REPOS+=("$REPO") ;;
+            FAILED)  FAILED_REPOS+=("$REPO") ;;
+        esac
+    done
+
+    rm -f "$TMP_REPO_LIST"
+
+    echo ""
+    echo "===== BRANCH CREATION SUMMARY ====="
+    echo "Successful: ${#SUCCESS_REPOS[@]}"
+    echo "Failed:     ${#FAILED_REPOS[@]}"
+    echo "Skipped:    ${#SKIPPED_REPOS[@]}"
+
+    if [[ ${#FAILED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Failed Repos:"
+        printf ' - %s\n' "${FAILED_REPOS[@]}"
+    fi
+
+    if [[ ${#SKIPPED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped Repos:"
+        printf ' - %s\n' "${SKIPPED_REPOS[@]}"
+    fi
+}
+
+function mkupstream() {
+    set +m
+
+    if [[ -z "$1" ]]; then
+        echo "Usage: mkupstream <branch-name>"
+        return 1
+    fi
+
+    local UPSTREAM_BRANCH="$1"
+    local ROOT_DIR="$(pwd)"
+    local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
+    local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
+    local UPSTREAM_REMOTE="axion"
+    local UPSTREAM_DEVICES_REMOTE="axion_devices"
+    local MAX_JOBS=12
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+
+    extract_projects_from_manifest() {
+        local manifest_file="$1"
+        local remote_name="$2"
+        grep '<project ' "$manifest_file" | \
+            grep "remote=\"$remote_name\"" | \
+            sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2|'"$remote_name"'/p'
+    }
+
+    [[ -f "$AXION_MANIFEST" ]] && extract_projects_from_manifest "$AXION_MANIFEST" "$UPSTREAM_REMOTE" >> "$TMP_REPO_LIST"
+    [[ -f "$ROOMSERVICE_MANIFEST" ]] && extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "$UPSTREAM_DEVICES_REMOTE" >> "$TMP_REPO_LIST"
+
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
+    local -a SUCCESS_REPOS=()
+    local -a FAILED_REPOS=()
+    local -a SKIPPED_REPOS=()
+
+    process_repo() {
+        local REPO_PATH="$1"
+        local REPO_NAME="$2"
+        local PUSH_REMOTE="$3"
+
+        echo "[INFO] Setting upstream for $REPO_PATH ($PUSH_REMOTE/$UPSTREAM_BRANCH)..."
+
+        if [[ ! -d "$ROOT_DIR/$REPO_PATH" ]]; then
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        cd "$ROOT_DIR/$REPO_PATH" || return
+
+        if ! git remote | grep -q "^$PUSH_REMOTE$"; then
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        git fetch "$PUSH_REMOTE" "$UPSTREAM_BRANCH" >/dev/null 2>&1 || {
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        }
+
+        if git rev-parse --verify "$UPSTREAM_BRANCH" >/dev/null 2>&1; then
+            git branch --set-upstream-to="$PUSH_REMOTE/$UPSTREAM_BRANCH" "$UPSTREAM_BRANCH" >/dev/null 2>&1
+        else
+            git checkout -b "$UPSTREAM_BRANCH" "$PUSH_REMOTE/$UPSTREAM_BRANCH" >/dev/null 2>&1
+        fi
+
+        echo "SUCCESS $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+    }
+
+    local TOTAL_REPOS
+    TOTAL_REPOS=$(wc -l < "$TMP_REPO_LIST")
+    local PROCESSED=0
+    local JOBS=0
+
+    while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE; do
+        PROCESSED=$((PROCESSED + 1))
+        echo "→ $PROCESSED/$TOTAL_REPOS: $REPO_PATH"
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$PUSH_REMOTE" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+        JOBS=$((JOBS + 1))
+        if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
+            wait -n
+            JOBS=$((JOBS - 1))
+        fi
+    done < "$TMP_REPO_LIST"
+
+    wait
+
+    for STATUS_FILE in "$TMP_DIR"/*.status; do
+        [[ ! -f "$STATUS_FILE" ]] && continue
+        local RESULT
+        RESULT=$(cut -d' ' -f1 "$STATUS_FILE")
+        local REPO
+        REPO=$(cut -d' ' -f2- "$STATUS_FILE")
+        case "$RESULT" in
+            SUCCESS) SUCCESS_REPOS+=("$REPO") ;;
+            SKIPPED) SKIPPED_REPOS+=("$REPO") ;;
+            FAILED)  FAILED_REPOS+=("$REPO") ;;
+        esac
+    done
+
+    rm -rf "$TMP_REPO_LIST" "$TMP_DIR"
+
+    echo ""
+    echo "===== UPSTREAM SETTING SUMMARY ====="
+    echo "Successful: ${#SUCCESS_REPOS[@]}"
+    echo "Skipped:    ${#SKIPPED_REPOS[@]}"
+    echo "Failed:     ${#FAILED_REPOS[@]}"
+
+    if [[ ${#FAILED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Failed Repos:"
+        printf ' - %s\n' "${FAILED_REPOS[@]}"
+    fi
+
+    if [[ ${#SKIPPED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped Repos:"
+        printf ' - %s\n' "${SKIPPED_REPOS[@]}"
+    fi
+}
+
+function ax_remote() {
+    set +m
+
+    local ROOT_DIR="$(pwd)"
+    local REMOTE_NAME="axion"
+    local REMOTE_BASE_URL="https://github.com/AxionAOSP"
+    local MAX_JOBS=12
+
+    local TMP_REPO_LIST
+    TMP_REPO_LIST=$(mktemp)
+    local TMP_DIR
+    TMP_DIR=$(mktemp -d)
+
+    repo list -p > "$TMP_REPO_LIST"
+
+    local -a SUCCESS_REPOS=()
+    local -a FAILED_REPOS=()
+    local -a SKIPPED_REPOS=()
+
+    process_repo() {
+        local REPO_PATH="$1"
+        local LOGFILE="$TMP_DIR/${REPO_PATH//\//_}.log"
+        local STATUSFILE="$TMP_DIR/${REPO_PATH//\//_}.status"
+
+        echo "[INFO] Adding remote for $REPO_PATH..." >> "$LOGFILE"
+
+        if [[ ! -d "$ROOT_DIR/$REPO_PATH/.git" ]]; then
+            echo "SKIPPED $REPO_PATH" > "$STATUSFILE"
+            return
+        fi
+
+        cd "$ROOT_DIR/$REPO_PATH" || {
+            echo "FAILED $REPO_PATH" > "$STATUSFILE"
+            return
+        }
+
+        if git remote | grep -qx "$REMOTE_NAME"; then
+            echo "SKIPPED $REPO_PATH" > "$STATUSFILE"
+            return
+        fi
+
+        local REPO_NAME="${REPO_PATH##*/}"
+
+        if git remote add "$REMOTE_NAME" "$REMOTE_BASE_URL/$REPO_NAME.git" >>"$LOGFILE" 2>&1; then
+            echo "SUCCESS $REPO_PATH" > "$STATUSFILE"
+        else
+            echo "FAILED $REPO_PATH" > "$STATUSFILE"
+        fi
+    }
+
+    local TOTAL_REPOS
+    TOTAL_REPOS=$(wc -l < "$TMP_REPO_LIST")
+    local PROCESSED=0
+    local JOBS=0
+
+    while read -r REPO_PATH; do
+        PROCESSED=$((PROCESSED + 1))
+        echo "→ $PROCESSED/$TOTAL_REPOS: $REPO_PATH"
+
+        { (process_repo "$REPO_PATH" > /dev/null 2>&1) & }
+
+        JOBS=$((JOBS + 1))
+        if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
+            wait -n
+            JOBS=$((JOBS - 1))
+        fi
+    done < "$TMP_REPO_LIST"
+
+    wait
+
+    for STATUS_FILE in "$TMP_DIR"/*.status; do
+        [[ ! -f "$STATUS_FILE" ]] && continue
+        local RESULT
+        RESULT=$(cut -d' ' -f1 "$STATUS_FILE")
+        local REPO
+        REPO=$(cut -d' ' -f2- "$STATUS_FILE")
+        case "$RESULT" in
+            SUCCESS) SUCCESS_REPOS+=("$REPO") ;;
+            SKIPPED) SKIPPED_REPOS+=("$REPO") ;;
+            FAILED)  FAILED_REPOS+=("$REPO") ;;
+        esac
+    done
+
+    rm -rf "$TMP_REPO_LIST" "$TMP_DIR"
+
+    echo ""
+    echo "===== AXION REMOTE ADD SUMMARY ====="
+    echo "Successful: ${#SUCCESS_REPOS[@]}"
+    echo "Skipped:    ${#SKIPPED_REPOS[@]}"
+    echo "Failed:     ${#FAILED_REPOS[@]}"
+
+    if [[ ${#FAILED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Failed Repos:"
+        printf ' - %s\n' "${FAILED_REPOS[@]}"
+    fi
+
+    if [[ ${#SKIPPED_REPOS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped Repos:"
+        printf ' - %s\n' "${SKIPPED_REPOS[@]}"
+    fi
 }
 
 setup_keys
