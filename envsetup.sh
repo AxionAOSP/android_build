@@ -2684,6 +2684,83 @@ function ax_remote() {
     fi
 }
 
+function repackThemes() {
+    python3 $ANDROID_BUILD_TOP/tools/themes/merge_theme_packs.py
+}
+
+function updateThemesRepo() {
+    python3 $ANDROID_BUILD_TOP/tools/themes/generate_themes_json.py
+    python3 $ANDROID_BUILD_TOP/tools/themes/fix_targets.py
+}
+
+function buildThemes() {
+    echo "========================================="
+    echo "  Theme Build Automation"
+    echo "========================================="
+    echo ""
+    
+    local target_device
+    target_device="$(get_build_var TARGET_DEVICE)"
+    local staging_dir="$HOME/ROM/themes"
+    
+    echo "[1/2] Building theme APKs..."
+    local unified_dir="$ANDROID_BUILD_TOP/vendor/addons/themes/UnifiedPacks"
+    local theme_count=0
+    local built_count=0
+    
+    for theme_dir in "$unified_dir"/icon_packs/* "$unified_dir"/icon_shapes/*; do
+        if [ -d "$theme_dir" ]; then
+            local theme_name=$(basename "$theme_dir")
+            echo "  Building $theme_name..."
+            if m "$theme_name" > /dev/null 2>&1; then
+                built_count=$((built_count + 1))
+                echo "  ✓ $theme_name built"
+            else
+                echo "  ✗ $theme_name failed"
+            fi
+            theme_count=$((theme_count + 1))
+        fi
+    done
+    
+    echo ""
+    echo "✓ Built $built_count of $theme_count themes"
+    echo ""
+    
+    echo "[2/2] Staging APKs to $staging_dir..."
+    mkdir -p "$staging_dir"
+    rm -rf "$staging_dir"/*
+    
+    local copied_count=0
+    for theme_dir in "$unified_dir"/icon_packs/* "$unified_dir"/icon_shapes/*; do
+        if [ -d "$theme_dir" ]; then
+            local theme_name=$(basename "$theme_dir")
+            local apk_name="${theme_name}.apk"
+            
+            # Find APK using same pattern as biApp
+            local apk_path
+            apk_path=$(find "out/target/product/$target_device/" \
+                \( -path "*/system_ext/*" -o -path "*/product/*" -o -path "*/system/*" \) \
+                -type f -name "$apk_name" -print -quit)
+            
+            if [ -n "$apk_path" ] && [ -f "$apk_path" ]; then
+                cp "$apk_path" "$staging_dir/"
+                copied_count=$((copied_count + 1))
+                echo "  ✓ Copied $apk_name"
+            fi
+        fi
+    done
+    
+    echo ""
+    echo "========================================="
+    echo "  Summary"
+    echo "========================================="
+    echo "  Themes built: $built_count"
+    echo "  APKs staged:  $copied_count"
+    echo "  Staging dir:  $staging_dir"
+    echo ""
+    echo "Done! APKs are ready for repository upload."
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
