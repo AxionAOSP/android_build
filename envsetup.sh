@@ -1339,6 +1339,10 @@ function ax_help() {
     echo
     echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
     echo
+    echo -e "${BOLD}Optimizations commands:${RESET}"
+    echo -e "  ${YELLOW}setupPerf${RESET}   ${CYAN}enable build optimization${RESET}"
+    echo -e "  ${YELLOW}setupSwap${RESET}   ${CYAN}enable 64gb swap${RESET}"
+    echo
     echo -e "${BOLD}Build Types:${RESET}"
     echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
     echo -e "  ${YELLOW}-fb${RESET}  ${CYAN}Fastboot${RESET}"
@@ -2759,6 +2763,55 @@ function buildThemes() {
     echo "  Staging dir:  $staging_dir"
     echo ""
     echo "Done! APKs are ready for repository upload."
+}
+
+function setupSwap() {
+    sudo swapoff /swapfile 2>/dev/null
+    sudo rm -f /swapfile
+
+    if sudo fallocate -l 64G /swapfile 2>/dev/null; then
+        echo "  swapfile created"
+    else
+        echo "  using dd"
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=65536 status=none
+    fi
+
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile >/dev/null
+    sudo swapon /swapfile
+
+    if ! grep -q "^/swapfile " /etc/fstab; then
+        echo "" | sudo tee -a /etc/fstab >/dev/null
+        echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab >/dev/null
+    fi
+}
+
+function setupPerf() {
+    sudo sysctl -w vm.swappiness=1 >/dev/null
+    sudo swapoff -a
+    sudo swapon -a
+    sudo sysctl -w vm.page-cluster=0 >/dev/null
+
+    echo "setup build limits"
+
+    export NINJA_ARGS="-j12"
+    export SOONG_JOBS=12
+
+    export USE_LLD=true
+
+    export GOMEMLIMIT=8GiB
+    export GOGC=50
+
+    export _JAVA_OPTIONS="-Xmx4g"
+    export DEX2OAT_XMX=4g
+
+    echo "  ninja: $NINJA_ARGS"
+    echo "  soong jobs: $SOONG_JOBS"
+    echo "  lld enabled"
+    echo "  go mem limit: $GOMEMLIMIT"
+    echo "  java xmx: 4g"
+
+    echo "[done]"
 }
 
 setup_keys
