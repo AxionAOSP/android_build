@@ -2149,6 +2149,37 @@ function writeFlag() {
     fi
 }
 
+function set_gpu_paths() {
+    local T=$(gettop)
+    if [ ! "$T" ]; then
+        echo "Couldn't locate the top of the tree.  Try setting TOP."
+        return
+    fi
+
+    local target_board_platform=$(get_build_var TARGET_BOARD_PLATFORM)
+    local gpu_path=""
+
+    case $target_board_platform in
+        gs101)
+            gpu_path="/sys/devices/platform/1c500000.mali"
+            ;;
+        gs201)
+            gpu_path="/sys/devices/platform/28000000.mali"
+            ;;
+        zuma|zumapro)
+            gpu_path="/sys/devices/platform/1f000000.mali"
+            ;;
+        *)
+            return
+            ;;
+    esac
+
+    if [ -n "$gpu_path" ]; then
+        writeFlag "GPU_FREQS_PATH" "$gpu_path/available_frequencies"
+        writeFlag "GPU_MIN_FREQ_PATH" "$gpu_path/hint_min_freq"
+    fi
+}
+
 function clearFlags() {
     if [ -f "$AX_FLAGS_FILE" ]; then
         rm -f "$AX_FLAGS_FILE"
@@ -2822,6 +2853,7 @@ source_vendorsetup
 addcompletions
 ax_help
 generate_host_overrides
+set_gpu_paths
 
 if [[ "$USE_LEFTOVERS" -eq 1 ]]; then
   leftovers
