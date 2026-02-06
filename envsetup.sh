@@ -2151,11 +2151,10 @@ function writeFlag() {
 function set_gpu_paths() {
     local T=$(gettop)
     if [ ! "$T" ]; then
-        echo "Couldn't locate the top of the tree.  Try setting TOP."
         return
     fi
 
-    local target_board_platform=$(get_build_var TARGET_BOARD_PLATFORM)
+    local target_board_platform=$(get_build_var TARGET_BOARD_PLATFORM 2>/dev/null)
     local gpu_path=""
 
     case $target_board_platform in
@@ -2384,10 +2383,10 @@ function mkbranch-all() {
         local REMOTE_URL=""
         case "$REMOTE" in
             axion)
-                REMOTE_URL="${BASE_AXION}${REPO_NAME}.git"
+                REMOTE_URL="${BASE_AXION}${REPO_NAME//\//_}.git"
                 ;;
             axion_devices)
-                REMOTE_URL="${BASE_AXION_DEVICES}${REPO_NAME}.git"
+                REMOTE_URL="${BASE_AXION_DEVICES}${REPO_NAME//\//_}.git"
                 ;;
             *)
                 echo "[ERROR] Unknown remote '$REMOTE' for $REPO_PATH"
@@ -2417,14 +2416,10 @@ function mkbranch-all() {
 
         git fetch "$REMOTE" >/dev/null 2>&1
 
-        if git rev-parse --verify "$NEW_BRANCH" >/dev/null 2>&1; then
-            git checkout "$NEW_BRANCH" >/dev/null 2>&1
-        else
-            if ! git checkout -b "$NEW_BRANCH" >/dev/null 2>&1; then
-                echo "[ERROR] Failed to create branch for $REPO_PATH"
-                echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
-                return
-            fi
+        if ! git checkout -B "$NEW_BRANCH" >/dev/null 2>&1; then
+            echo "[ERROR] Failed to create branch for $REPO_PATH"
+            echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
         fi
 
         if ! git push "$REMOTE" "$NEW_BRANCH":"$NEW_BRANCH" --set-upstream >/dev/null 2>&1; then
@@ -2541,6 +2536,8 @@ function mkupstream() {
             return
         fi
 
+        REPO_NAME="${REPO_NAME//\//_}"
+
         cd "$ROOT_DIR/$REPO_PATH" || return
 
         if ! git remote | grep -q "^$PUSH_REMOTE$"; then
@@ -2622,12 +2619,31 @@ function ax_remote() {
     local REMOTE_BASE_URL="https://github.com/AxionAOSP"
     local MAX_JOBS=12
 
+    local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
+    local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
+
     local TMP_REPO_LIST
     TMP_REPO_LIST=$(mktemp)
     local TMP_DIR
     TMP_DIR=$(mktemp -d)
 
-    repo list -p > "$TMP_REPO_LIST"
+    extract_projects_from_manifest() {
+        local manifest_file="$1"
+        local remote_name="$2"
+        grep '<project ' "$manifest_file" | \
+            grep "remote=\"$remote_name\"" | \
+            sed -n 's/.*path="\([^"]*\)".*name="\([^"]*\)".*/\1|\2|'"$remote_name"'/p'
+    }
+
+    if [[ -f "$AXION_MANIFEST" ]]; then
+        extract_projects_from_manifest "$AXION_MANIFEST" "axion" >> "$TMP_REPO_LIST"
+    else
+        echo "[WARN] axion.xml not found"
+    fi
+
+    if [[ -f "$ROOMSERVICE_MANIFEST" ]]; then
+        extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "axion" >> "$TMP_REPO_LIST"
+    fi
 
     local -a SUCCESS_REPOS=()
     local -a FAILED_REPOS=()
@@ -2635,6 +2651,8 @@ function ax_remote() {
 
     process_repo() {
         local REPO_PATH="$1"
+        local REPO_NAME="$2"
+        local REMOTE="$3"
         local LOGFILE="$TMP_DIR/${REPO_PATH//\//_}.log"
         local STATUSFILE="$TMP_DIR/${REPO_PATH//\//_}.status"
 
@@ -2655,7 +2673,11 @@ function ax_remote() {
             return
         fi
 
-        local REPO_NAME="${REPO_PATH##*/}"
+        if git remote | grep -qx "$REMOTE_NAME"; then
+             git remote remove "$REMOTE_NAME" >/dev/null 2>&1
+        fi
+
+        REPO_NAME="${REPO_NAME//\//_}"
 
         if git remote add "$REMOTE_NAME" "$REMOTE_BASE_URL/$REPO_NAME.git" >>"$LOGFILE" 2>&1; then
             echo "SUCCESS $REPO_PATH" > "$STATUSFILE"
@@ -2669,11 +2691,11 @@ function ax_remote() {
     local PROCESSED=0
     local JOBS=0
 
-    while read -r REPO_PATH; do
+    while IFS='|' read -r REPO_PATH REPO_NAME REMOTE; do
         PROCESSED=$((PROCESSED + 1))
         echo "→ $PROCESSED/$TOTAL_REPOS: $REPO_PATH"
 
-        { (process_repo "$REPO_PATH" > /dev/null 2>&1) & }
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$REMOTE" > /dev/null 2>&1) & }
 
         JOBS=$((JOBS + 1))
         if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
