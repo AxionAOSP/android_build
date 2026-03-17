@@ -1652,6 +1652,8 @@ function gk() {
     echo "Generating keys..."
     generate_keys "${key_names[@]}"
     echo "PRODUCT_DEFAULT_DEV_CERTIFICATE := vendor/lineage-priv/keys/releasekey" > vendor/lineage-priv/keys/keys.mk
+    echo "PRODUCT_MAINLINE_SEPOLICY_DEV_CERTIFICATES := \$(dir \$(PRODUCT_DEFAULT_DEV_CERTIFICATE))" >> vendor/lineage-priv/keys/keys.mk
+    echo "PRODUCT_MAINLINE_BLUETOOTH_SEPOLICY_DEV_CERTIFICATES := \$(dir \$(PRODUCT_DEFAULT_DEV_CERTIFICATE))" >> vendor/lineage-priv/keys/keys.mk
     bazel_build_content="filegroup(
     name = \"android_certificate_directory\",
     srcs = glob([
@@ -1674,6 +1676,7 @@ function gk() {
             openssl pkcs8 -in $ANDROID_KEY_PATH/$apex.pk8 -inform DER -nocrypt -out $ANDROID_KEY_PATH/$apex.pem
         done
     fi
+    
 }
 
 function remove_keys() {
