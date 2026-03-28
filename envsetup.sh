@@ -2880,6 +2880,16 @@ function setupPerf() {
     echo "[done]"
 }
 
+function tm() {
+    repo forall -c '
+      AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null)
+      DIRTY=$(git status --short 2>/dev/null)
+      if [ "$AHEAD" -gt 0 ] || [ -n "$DIRTY" ]; then
+        echo "$REPO_PATH"
+      fi
+    ' 2>/dev/null
+}
+
 setup_keys
 setup_ccache
 validate_current_shell
