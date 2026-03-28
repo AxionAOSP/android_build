@@ -23,7 +23,7 @@ import os
 import sys
 
 ANDROID_MANIFEST_TEMPLATE="""<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="%s.auto_generated_rro_%s__"
+    package="%s.axion_auto_generated_rro_%s__"
     android:versionCode="1"
     android:versionName="1.0">
     <overlay android:targetPackage="%s" android:priority="%s" android:isStatic="true"/>
