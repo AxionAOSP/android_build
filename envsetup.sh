@@ -1816,6 +1816,7 @@ function bpx() {
     declare -A PIXEL_SERIES=(
         [6]="raven oriole bluejay"
         [7]="cheetah panther lynx"
+        [8]="husky shiba akita"
     )
 
     run_step() {
