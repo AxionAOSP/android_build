@@ -1226,12 +1226,12 @@ function axion() {
     local device=""
     local build_type=""
     local gms_enabled=false
-    local core_gms=false
+    local gapps_variant=""
     local vanilla_enabled=false
 
     for arg in "$@"; do
         case "$arg" in
-            gms)
+            gms|full)
                 if [[ "$gms_enabled" == true ]]; then
                     echo "Error: GMS already specified."
                     return 1
@@ -1242,12 +1242,16 @@ function axion() {
                 fi
                 gms_enabled=true
                 ;;
-            core)
+            pico|core)
                 if [[ "$gms_enabled" != true ]]; then
-                    echo "Error: Core GMS variant specified without enabling GMS."
+                    echo "Error: GMS variant '$arg' specified without enabling GMS."
                     return 1
                 fi
-                core_gms=true
+                if [[ -n "$gapps_variant" ]]; then
+                    echo "Error: Multiple GMS variants specified ($gapps_variant and $arg)."
+                    return 1
+                fi
+                gapps_variant="$arg"
                 ;;
             va|vanilla)
                 if [[ "$vanilla_enabled" == true ]]; then
@@ -1282,9 +1286,9 @@ function axion() {
             device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
             echo "No argument found for device, using TARGET_PRODUCT as device: $device"
         else
-            echo "Correct usage: axion <device_codename> [build_type] [gms [core] | va]"
+            echo "Correct usage: axion <device_codename> [build_type] [gms [pico|core|full] | va]"
             echo "Available build types: user, userdebug, eng"
-            echo "Available GMS variants: core"
+            echo "Available GMS variants: pico (Main), core (Android), full (Full)"
             echo "Use 'va' or 'vanilla' for a non-GMS build."
             return 1
         fi
@@ -1296,17 +1300,28 @@ function axion() {
 
     if [[ "$gms_enabled" == true ]]; then
         export WITH_GMS=true
-        if [[ "$core_gms" == true ]]; then
-            export TARGET_CORE_GMS=true
-        else
-            export TARGET_CORE_GMS=false
-        fi
+        case "$gapps_variant" in
+            pico)
+                export TARGET_GAPPS_VARIANT=pico
+                export TARGET_CORE_GMS=false
+                ;;
+            core)
+                export TARGET_GAPPS_VARIANT=core
+                export TARGET_CORE_GMS=true
+                ;;
+            *)
+                export TARGET_GAPPS_VARIANT=gms
+                export TARGET_CORE_GMS=false
+                ;;
+        esac
     elif [[ "$vanilla_enabled" == true ]]; then
         export WITH_GMS=false
         unset TARGET_CORE_GMS
+        unset TARGET_GAPPS_VARIANT
     else
         export WITH_GMS=false
         unset TARGET_CORE_GMS
+        unset TARGET_GAPPS_VARIANT
     fi
 
     source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
@@ -1339,7 +1354,7 @@ function ax_help() {
     echo
     echo -e "Use ${YELLOW}axion${RESET} instead of ${YELLOW}lunch${RESET}."
     echo
-    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [core] | vanilla]${RESET}"
+    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [pico|core] | vanilla]${RESET}"
     echo
     echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
     echo
