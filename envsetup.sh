@@ -1225,40 +1225,28 @@ unset treegrep
 function axion() {
     local device=""
     local build_type=""
-    local gms_enabled=false
-    local gapps_variant=""
+    local gms_variant=""
     local vanilla_enabled=false
 
     for arg in "$@"; do
         case "$arg" in
-            gms|full)
-                if [[ "$gms_enabled" == true ]]; then
-                    echo "Error: GMS already specified."
-                    return 1
-                fi
+            gms|full|pico|core)
                 if [[ "$vanilla_enabled" == true ]]; then
                     echo "Error: Cannot specify both GMS and vanilla."
                     return 1
                 fi
-                gms_enabled=true
-                ;;
-            pico|core)
-                if [[ "$gms_enabled" != true ]]; then
-                    echo "Error: GMS variant '$arg' specified without enabling GMS."
+                if [[ -n "$gms_variant" ]]; then
+                    echo "Error: Multiple GMS variants specified ($gms_variant and $arg)."
                     return 1
                 fi
-                if [[ -n "$gapps_variant" ]]; then
-                    echo "Error: Multiple GMS variants specified ($gapps_variant and $arg)."
-                    return 1
-                fi
-                gapps_variant="$arg"
+                gms_variant="$arg"
                 ;;
             va|vanilla)
                 if [[ "$vanilla_enabled" == true ]]; then
                     echo "Error: Vanilla already specified."
                     return 1
                 fi
-                if [[ "$gms_enabled" == true ]]; then
+                if [[ -n "$gms_variant" ]]; then
                     echo "Error: Cannot specify both GMS and vanilla."
                     return 1
                 fi
@@ -1286,9 +1274,9 @@ function axion() {
             device=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
             echo "No argument found for device, using TARGET_PRODUCT as device: $device"
         else
-            echo "Correct usage: axion <device_codename> [build_type] [gms [pico|core|full] | va]"
+            echo "Correct usage: axion <device_codename> [build_type] [gms|pico|core|full|va]"
             echo "Available build types: user, userdebug, eng"
-            echo "Available GMS variants: pico (Main), core (Android), full (Full)"
+            echo "Available GMS variants: pico (Main), core (Android), gms/full (Full)"
             echo "Use 'va' or 'vanilla' for a non-GMS build."
             return 1
         fi
@@ -1298,29 +1286,18 @@ function axion() {
         build_type="userdebug"
     fi
 
-    if [[ "$gms_enabled" == true ]]; then
+    if [[ -n "$gms_variant" ]]; then
         export WITH_GMS=true
-        case "$gapps_variant" in
-            pico)
-                export TARGET_GAPPS_VARIANT=pico
-                export TARGET_CORE_GMS=false
+        case "$gms_variant" in
+            pico|core)
+                export TARGET_GAPPS_VARIANT="$gms_variant"
                 ;;
-            core)
-                export TARGET_GAPPS_VARIANT=core
-                export TARGET_CORE_GMS=true
-                ;;
-            *)
+            gms|full)
                 export TARGET_GAPPS_VARIANT=gms
-                export TARGET_CORE_GMS=false
                 ;;
         esac
-    elif [[ "$vanilla_enabled" == true ]]; then
-        export WITH_GMS=false
-        unset TARGET_CORE_GMS
-        unset TARGET_GAPPS_VARIANT
     else
         export WITH_GMS=false
-        unset TARGET_CORE_GMS
         unset TARGET_GAPPS_VARIANT
     fi
 
@@ -1354,7 +1331,7 @@ function ax_help() {
     echo
     echo -e "Use ${YELLOW}axion${RESET} instead of ${YELLOW}lunch${RESET}."
     echo
-    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms [pico|core] | vanilla]${RESET}"
+    echo -e "axion Usage: ${YELLOW}axion <device_codename> [user|userdebug|eng] [gms|pico|core|full|vanilla]${RESET}"
     echo
     echo -e "${BOLD}ax usage:${RESET} ${YELLOW}ax [-b|-fb|-br] [-j<num>] [user|eng|userdebug]${RESET}"
     echo
@@ -1814,7 +1791,7 @@ function cpo() {
     mkdir -p "$base_dest_dir"
     mv "$latest_zip" "$base_dest_dir" && echo "Moved $(basename "$latest_zip") to $base_dest_dir"
 
-    if [[ "$latest_zip" == *GMS* ]]; then
+    if [[ "$(basename "$latest_zip")" =~ -(GMS|PICO|CORE)-${device}\.zip$ ]]; then
         local dest_dir="$base_dest_dir/GMS"
         mkdir -p "$dest_dir"
         mv "$output_dir/GMS/$device.json" "$dest_dir" && echo "Moved $device.json from GMS folder"
@@ -1864,7 +1841,11 @@ function bpx() {
 
     for device in "${devices[@]}"; do
         local vanilla_matches=($(compgen -G "$base_dir/axion-*VANILLA-$device.zip"))
-        local gms_matches=($(compgen -G "$base_dir/axion-*GMS-$device.zip"))
+        local gms_matches=(
+            $(compgen -G "$base_dir/axion-*GMS-$device.zip")
+            $(compgen -G "$base_dir/axion-*PICO-$device.zip")
+            $(compgen -G "$base_dir/axion-*CORE-$device.zip")
+        )
 
         # VANILLA
         if (( ${#vanilla_matches[@]} == 0 )); then
