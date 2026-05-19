@@ -1900,7 +1900,8 @@ function initPixelRoomService() {
 function rbr() {
     set +m
 
-    local ROOT_DIR="$(pwd)"
+    local ROOT_DIR="${ANDROID_BUILD_TOP:-$(gettop 2>/dev/null)}"
+    ROOT_DIR="${ROOT_DIR:-$(pwd)}"
     local AXION_MANIFEST="$ROOT_DIR/android/snippets/axion.xml"
     local ROOMSERVICE_MANIFEST="$ROOT_DIR/.repo/local_manifests/roomservice.xml"
     local TARGET_BRANCH=$LINEAGE_VERSION
@@ -1908,16 +1909,31 @@ function rbr() {
 
     local UPSTREAM_REMOTE="axion"
     local UPSTREAM_DEVICES_REMOTE="axion_devices"
+    local UPSTREAM_DEVICES_ORG="AxionAOSP-devices"
 
     local REBASE_AXION=true
     local REBASE_DEVICES=true
 
     local -a BLACKLIST=("frameworks/base vendor/official_devices")
 
+    rbr_usage() {
+        cat <<EOF
+Usage: rbr [option]
+
+Options:
+  -a          Rebase Axion AOSP repos and roomservice device repos (default)
+  -m          Rebase only Axion AOSP repos from android/snippets/axion.xml
+  -d          Rebase only Axion device repos from .repo/local_manifests/roomservice.xml
+  -h          Show this help
+EOF
+    }
+
     case "$1" in
         -m) REBASE_DEVICES=false ;;
         -d) REBASE_AXION=false ;;
-        -a|""|*) ;;
+        -a|"") ;;
+        -h) rbr_usage; return 0 ;;
+        *) echo "[ERROR] Unknown option: $1"; rbr_usage; return 1 ;;
     esac
 
     local TMP_REPO_LIST
@@ -1932,12 +1948,23 @@ function rbr() {
             sed -n "s/.*path=\"\([^\"]*\\)\".*name=\"\([^\"]*\)\".*/\1|\2|$remote_name/p"
     }
 
+    extract_roomservice_projects() {
+        local manifest_file="$1"
+
+        grep '<project ' "$manifest_file" | \
+            grep "name=\"$UPSTREAM_DEVICES_ORG/" | \
+            sed -n "s/.*path=\"\([^\"]*\)\".*remote=\"\([^\"]*\)\".*name=\"$UPSTREAM_DEVICES_ORG\/\([^\"]*\)\".*/\1|\3|\2|device/p"
+
+        extract_projects_from_manifest "$manifest_file" "$UPSTREAM_DEVICES_REMOTE" | \
+            sed 's/$/|device/'
+    }
+
     if $REBASE_AXION && [[ -f "$AXION_MANIFEST" ]]; then
-        extract_projects_from_manifest "$AXION_MANIFEST" "$UPSTREAM_REMOTE" >> "$TMP_REPO_LIST"
+        extract_projects_from_manifest "$AXION_MANIFEST" "$UPSTREAM_REMOTE" | sed 's/$/|manifest/' >> "$TMP_REPO_LIST"
     fi
 
     if $REBASE_DEVICES && [[ -f "$ROOMSERVICE_MANIFEST" ]]; then
-        extract_projects_from_manifest "$ROOMSERVICE_MANIFEST" "$UPSTREAM_DEVICES_REMOTE" >> "$TMP_REPO_LIST"
+        extract_roomservice_projects "$ROOMSERVICE_MANIFEST" >> "$TMP_REPO_LIST"
     fi
 
     local -a SUCCESS_REPOS=()
@@ -1954,10 +1981,24 @@ function rbr() {
         return 1
     }
 
+    has_tree_changes_against() {
+        local base_ref="$1"
+        ! git diff --quiet "$base_ref" HEAD --
+    }
+
+    is_empty_merge_commit() {
+        local commit="$1"
+        local parent_count
+        parent_count=$(git rev-list --parents -n 1 "$commit" | wc -w)
+
+        [[ "$parent_count" -gt 2 ]] && git diff --quiet "${commit}^1" "$commit" --
+    }
+
     process_repo() {
         local REPO_PATH="$1"
         local REPO_NAME="$2"
         local PUSH_REMOTE="$3"
+        local REPO_KIND="$4"
 
         echo "[INFO] Processing $REPO_PATH ($REPO_NAME) with remote '$PUSH_REMOTE'..."
 
@@ -1978,10 +2019,22 @@ function rbr() {
                 return
             }
 
+            if ! has_tree_changes_against FETCH_HEAD; then
+                echo "[INFO] No meaningful tree changes against LineageOS/$TARGET_BRANCH; skipping cherry-pick."
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            fi
+
             local commits skipped=0
             commits=$(git log --reverse -n 10 --format='%H')
 
             for commit in $commits; do
+                if is_empty_merge_commit "$commit"; then
+                    echo "[INFO] Skipping empty merge commit: $(git log -1 --format='%h %s' "$commit")"
+                    skipped=$((skipped + 1))
+                    continue
+                fi
+
                 if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
                     if git log FETCH_HEAD..HEAD --oneline | grep -q "$(git log -1 --format='%s' "$commit")"; then
                         echo "[INFO] Commit already applied, skipping."
@@ -2001,7 +2054,7 @@ function rbr() {
             return
         fi
 
-        if [[ "$PUSH_REMOTE" == "$UPSTREAM_DEVICES_REMOTE" ]]; then
+        if [[ "$REPO_KIND" == "device" ]]; then
             echo "[INFO] Device repo: $REPO_PATH. Backing up local commits."
 
             git fetch "$PUSH_REMOTE" "$TARGET_BRANCH" || {
@@ -2017,11 +2070,22 @@ function rbr() {
                 return
             }
 
+            if ! has_tree_changes_against FETCH_HEAD; then
+                echo "[INFO] No meaningful tree changes against LineageOS/$TARGET_BRANCH; skipping rebase."
+                echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+                return
+            fi
+
             git reset --hard FETCH_HEAD >/dev/null 2>&1
 
             local commits
             commits=$(git log --reverse "$backup_branch" --not FETCH_HEAD --format='%H')
             for commit in $commits; do
+                if is_empty_merge_commit "$commit"; then
+                    echo "[INFO] Skipping empty merge commit: $(git log -1 --format='%h %s' "$commit")"
+                    continue
+                fi
+
                 if ! git cherry-pick -x "$commit" >/dev/null 2>&1; then
                     echo "[ERROR] Cherry-pick conflict on $REPO_PATH."
                     git cherry-pick --abort >/dev/null 2>&1
@@ -2042,8 +2106,14 @@ function rbr() {
             return
         }
 
+        local DID_REBASE=false
+
         echo "[INFO] Rebasing onto $PUSH_REMOTE/$TARGET_BRANCH..."
-        if ! git rebase FETCH_HEAD 2>/dev/null; then
+        if ! has_tree_changes_against FETCH_HEAD; then
+            echo "[INFO] No meaningful tree changes against $PUSH_REMOTE/$TARGET_BRANCH; skipping rebase."
+        elif git rebase FETCH_HEAD 2>/dev/null; then
+            DID_REBASE=true
+        else
             git rebase --abort >/dev/null 2>&1
             echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
             return
@@ -2056,9 +2126,19 @@ function rbr() {
         }
 
         echo "[INFO] Rebasing onto LineageOS/$TARGET_BRANCH..."
-        if ! git rebase FETCH_HEAD 2>/dev/null; then
+        if ! has_tree_changes_against FETCH_HEAD; then
+            echo "[INFO] No meaningful tree changes against LineageOS/$TARGET_BRANCH; skipping rebase."
+        elif git rebase FETCH_HEAD 2>/dev/null; then
+            DID_REBASE=true
+        else
             git rebase --abort >/dev/null 2>&1
             echo "FAILED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
+            return
+        fi
+
+        if ! $DID_REBASE; then
+            echo "[OK] No meaningful changes to rebase: $REPO_PATH"
+            echo "SKIPPED $REPO_PATH" > "$TMP_DIR/${REPO_PATH//\//_}.status"
             return
         fi
 
@@ -2074,11 +2154,11 @@ function rbr() {
 
     echo "[INFO] Performing rebase operations"
 
-    while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE; do
+    while IFS='|' read -r REPO_PATH REPO_NAME PUSH_REMOTE REPO_KIND; do
         PROCESSED=$((PROCESSED + 1))
         echo "Processing $PROCESSED/$TOTAL_REPOS: $REPO_PATH..."
 
-        { (process_repo "$REPO_PATH" "$REPO_NAME" "$PUSH_REMOTE" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
+        { (process_repo "$REPO_PATH" "$REPO_NAME" "$PUSH_REMOTE" "$REPO_KIND" > "$TMP_DIR/${REPO_PATH//\//_}.log" 2>&1) & } 2>/dev/null
 
         JOBS=$((JOBS + 1))
         if [[ "$JOBS" -ge "$MAX_JOBS" ]]; then
