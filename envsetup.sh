@@ -1349,7 +1349,7 @@ function ax_help() {
     echo -e "  ${YELLOW}user | eng | userdebug${RESET}  ${CYAN}Build variant${RESET}"
     echo
     echo -e "${BOLD}Defaults:${RESET}"
-    echo -e "  ${YELLOW}Job count${RESET}  ${CYAN}-j$(nproc --all)${RESET}"
+    echo -e "  ${YELLOW}Job count${RESET}  ${CYAN}-j${BUILD_JOBS:-$(defaultBuildJobs)}${RESET}"
     echo -e "  ${YELLOW}Build variant${RESET}  ${CYAN}userdebug${RESET}"
     echo -e "  ${YELLOW}Build type${RESET}  ${CYAN}m${RESET}"
     echo -e "${BOLD}${GREEN}=========================================${RESET}"
@@ -1378,7 +1378,7 @@ function ax() {
         fi
     done
 
-    jCount="${jCount:--j$(nproc --all)}"
+    jCount="${jCount:--j${BUILD_JOBS:-$(defaultBuildJobs)}}"
 
     if [[ -n "$device" ]]; then
         export TARGET_PRODUCT="lineage_$device"
@@ -2932,28 +2932,95 @@ function setupSwap() {
     fi
 }
 
+function hostRamGb() {
+    local mem_kb
+    mem_kb="$(awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null)"
+
+    if [[ "$mem_kb" =~ ^[0-9]+$ ]] && (( mem_kb > 0 )); then
+        echo $(((mem_kb + 1048575) / 1048576))
+    else
+        echo 16
+    fi
+}
+
+function cpuCount() {
+    local cpus
+    cpus="$(nproc --all 2>/dev/null)"
+
+    if [[ "$cpus" =~ ^[0-9]+$ ]] && (( cpus > 0 )); then
+        echo "$cpus"
+    else
+        echo 8
+    fi
+}
+
+function perfConfigForRam() {
+    local ram_gb="$1"
+
+    if (( ram_gb <= 8 )); then
+        echo "4 4GiB 2g"
+    elif (( ram_gb <= 32 )); then
+        echo "8 8GiB 4g"
+    elif (( ram_gb < 64 )); then
+        echo "12 12GiB 6g"
+    else
+        echo "16 16GiB 8g"
+    fi
+}
+
+function defaultBuildJobs() {
+    local ram_gb
+    local cpu_count
+    local jobs
+
+    ram_gb="$(hostRamGb)"
+    cpu_count="$(cpuCount)"
+    jobs="$(perfConfigForRam "$ram_gb")"
+    jobs="${jobs%% *}"
+
+    if (( jobs > cpu_count )); then
+        jobs="$cpu_count"
+    fi
+
+    echo "$jobs"
+}
+
 function setupPerf() {
-    sudo sysctl -w vm.swappiness=1 >/dev/null
-    sudo sysctl -w vm.page-cluster=0 >/dev/null
+    local ram_gb
+    local cpu_count
+    local jobs
+    local go_mem_limit
+    local java_xmx
+
+    ram_gb="$(hostRamGb)"
+    cpu_count="$(cpuCount)"
+    read -r jobs go_mem_limit java_xmx <<< "$(perfConfigForRam "$ram_gb")"
+
+    if (( jobs > cpu_count )); then
+        jobs="$cpu_count"
+    fi
 
     echo "setup build limits"
 
-    export NINJA_ARGS="-j12"
-    export SOONG_JOBS=12
+    export BUILD_JOBS="$jobs"
+    export NINJA_ARGS="-j$jobs"
+    export SOONG_JOBS="$jobs"
 
     export USE_LLD=true
 
-    export GOMEMLIMIT=8GiB
+    export GOMEMLIMIT="$go_mem_limit"
     export GOGC=50
 
-    export _JAVA_OPTIONS="-Xmx4g"
-    export DEX2OAT_XMX=4g
+    export _JAVA_OPTIONS="-Xmx$java_xmx"
+    export DEX2OAT_XMX="$java_xmx"
 
+    echo "  ram: ${ram_gb}GiB"
+    echo "  cpus: $cpu_count"
     echo "  ninja: $NINJA_ARGS"
     echo "  soong jobs: $SOONG_JOBS"
     echo "  lld enabled"
     echo "  go mem limit: $GOMEMLIMIT"
-    echo "  java xmx: 4g"
+    echo "  java xmx: $java_xmx"
 
     echo "[done]"
 }
@@ -2974,6 +3041,7 @@ validate_current_shell
 set_global_paths
 source_vendorsetup
 addcompletions
+setupPerf
 ax_help
 generate_host_overrides
 set_gpu_paths
