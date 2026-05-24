@@ -2994,6 +2994,10 @@ function setupPerf() {
     local java_xmx
 
     ram_gb="$(hostRamGb)"
+    if (( ram_gb > 32 )); then
+        return 0
+    fi
+
     cpu_count="$(cpuCount)"
     read -r jobs go_mem_limit java_xmx <<< "$(perfConfigForRam "$ram_gb" "$cpu_count")"
 
