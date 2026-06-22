@@ -53,4 +53,4 @@ ifndef NINJA_GOALS
   NINJA_GOALS := droid
 endif
 # Goals we need to pass to Kati.
-KATI_GOALS := $(filter $(PARSE_TIME_MAKE_GOALS), $(ANDROID_GOALS))
+KATI_GOALS := $(filter $(PARSE_TIME_MAKE_GOALS), $(ANDROID_GOALS)) $(KATI_EXTRA_ARGS)

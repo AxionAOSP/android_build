@@ -2930,12 +2930,10 @@ function perfConfigForRam() {
 
     if (( ram_gb <= 8 )); then
         echo "4 4GiB 2g"
-    elif (( ram_gb <= 32 )); then
-        echo "8 8GiB 4g"
-    elif (( ram_gb < 64 )); then
-        echo "$cpu_count 12GiB 6g"
-    else
+    elif (( ram_gb < 32 )); then
         echo "$cpu_count 16GiB 8g"
+    else
+        echo "$cpu_count"
     fi
 }
 
@@ -2960,19 +2958,34 @@ function setupPerf() {
     local ram_gb
     local cpu_count
     local jobs
+    local highmem_jobs
     local go_mem_limit
     local java_xmx
 
     ram_gb="$(hostRamGb)"
-    if (( ram_gb > 32 )); then
+
+    if (( ram_gb >= 32 )); then
+        echo "setupPerf skipped: ${ram_gb}GiB RAM (build limits only applied below 32GiB)"
         return 0
     fi
 
     cpu_count="$(cpuCount)"
     read -r jobs go_mem_limit java_xmx <<< "$(perfConfigForRam "$ram_gb" "$cpu_count")"
 
+    if (( jobs > 6 )); then
+        jobs=6
+    fi
     if (( jobs > cpu_count )); then
         jobs="$cpu_count"
+    fi
+
+    if (( ram_gb <= 16 )); then
+        highmem_jobs=1
+    else
+        highmem_jobs=2
+    fi
+    if (( highmem_jobs > jobs )); then
+        highmem_jobs="$jobs"
     fi
 
     echo "setup build limits"
@@ -2980,6 +2993,7 @@ function setupPerf() {
     export BUILD_JOBS="$jobs"
     export NINJA_ARGS="-j$jobs"
     export SOONG_JOBS="$jobs"
+    export NINJA_HIGHMEM_NUM_JOBS="$highmem_jobs"
 
     export USE_LLD=true
 
@@ -2993,9 +3007,10 @@ function setupPerf() {
     echo "  cpus: $cpu_count"
     echo "  ninja: $NINJA_ARGS"
     echo "  soong jobs: $SOONG_JOBS"
+    echo "  highmem jobs: $NINJA_HIGHMEM_NUM_JOBS"
     echo "  lld enabled"
-    echo "  go mem limit: $GOMEMLIMIT"
-    echo "  java xmx: $java_xmx"
+    echo "  go mem limit: $GOMEMLIMIT (GC ${GOGC})"
+    echo "  java xmx: ${_JAVA_OPTIONS#-Xmx}"
 
     echo "[done]"
 }
