@@ -1570,35 +1570,123 @@ function iPart() {
 }
 
 function setup_ccache() {
-    if [ -z "${CCACHE_EXEC}" ]; then
-        if command -v ccache &>/dev/null; then
-            export USE_CCACHE=1
-            export CCACHE_EXEC=$(command -v ccache)
-            [ -z "${CCACHE_DIR}" ] && export CCACHE_DIR="$HOME/.ccache"
-            echo "ccache directory found, CCACHE_DIR set to: $CCACHE_DIR" >&2
+    if ! command -v ccache &>/dev/null; then
+        echo "Error: ccache not found. Please install ccache." >&2
+        return
+    fi
 
-            CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-40G}"
-            DIRECT_MODE="${DIRECT_MODE:-false}"
+    export USE_CCACHE=1
+    export CCACHE_EXEC=$(command -v ccache)
+    unset CCACHE_MAXSIZE DIRECT_MODE
 
-            $CCACHE_EXEC -o compression=true -o direct_mode="${DIRECT_MODE}" -M "${CCACHE_MAXSIZE}" \
-                && echo "ccache enabled, CCACHE_EXEC set to: $CCACHE_EXEC, CCACHE_MAXSIZE set to: $CCACHE_MAXSIZE, direct_mode set to: $DIRECT_MODE" >&2 \
-                || echo "Warning: Could not set cache size limit. Please check ccache configuration." >&2
+    local cc_root_mount cc_cur_mount cc_cfg cc_candidates cc_off_main cc_seen
+    local cc_dir cc_mount cc_count cc_target cc_fstype cc_avail
+    cc_root_mount=$(df -P / 2>/dev/null | awk 'NR==2 {print $NF}')
+    cc_cur_mount=""
+    [ -n "${CCACHE_DIR}" ] && [ -d "${CCACHE_DIR}" ] && cc_cur_mount=$(df -P "${CCACHE_DIR}" 2>/dev/null | awk 'NR==2 {print $NF}')
 
-            if [ -d "$CCACHE_DIR" ]; then
-                CURRENT_CCACHE_SIZE_BYTES=$(du -sb "$CCACHE_DIR" 2>/dev/null | awk '{print $1}')
-                CURRENT_CCACHE_SIZE_GB=$(echo "$CURRENT_CCACHE_SIZE_BYTES" | awk '{printf "%.2f\n", $1 / 1000 / 1000 / 1000}')
+    if [ -z "${CCACHE_DIR}" ] || [ ! -d "${CCACHE_DIR}" ] || [ "${cc_cur_mount}" = "${cc_root_mount}" ]; then
+        cc_cfg=$($CCACHE_EXEC -p 2>/dev/null | grep -oP '(?<=cache_dir = ).*')
 
-                if [ -n "$CURRENT_CCACHE_SIZE_GB" ]; then
-                    echo "Current ccache size is: ${CURRENT_CCACHE_SIZE_GB} GB" >&2
-                else
-                    echo "No cached files in ccache." >&2
-                fi
-            else
-                echo "Warning: ccache directory does not exist: $CCACHE_DIR" >&2
-            fi
+        cc_candidates=$(
+            [ -n "$cc_cfg" ] && printf '%s\n' "$cc_cfg"
+            df --output=target,fstype 2>/dev/null | tail -n +2 | while read -r cc_target cc_fstype; do
+                case "$cc_fstype" in
+                    ext2|ext3|ext4|xfs|btrfs|f2fs|zfs|reiserfs|jfs) ;;
+                    *) continue ;;
+                esac
+                [ "$cc_target" = "$cc_root_mount" ] && continue
+                [ -w "$cc_target" ] || continue
+                printf '%s/ccache\n' "$cc_target"
+            done
+        )
+
+        cc_off_main=""
+        cc_seen=""
+        while IFS= read -r cc_dir; do
+            [ -n "$cc_dir" ] || continue
+            case "$cc_seen" in *"|$cc_dir|"*) continue ;; esac
+            cc_seen="$cc_seen|$cc_dir|"
+            { [ -d "$cc_dir" ] && [ -n "$(ls -A "$cc_dir" 2>/dev/null)" ]; } || continue
+            cc_mount=$(df -P "$cc_dir" 2>/dev/null | awk 'NR==2 {print $NF}')
+            [ "$cc_mount" = "$cc_root_mount" ] && continue
+            cc_off_main="${cc_off_main}${cc_dir}"$'\n'
+        done <<EOF
+$cc_candidates
+EOF
+
+        cc_count=$(printf '%s' "$cc_off_main" | grep -c .)
+
+        if [ "$cc_count" -ge 2 ]; then
+            local cc_best cc_best_kb cc_kb
+            cc_best=""
+            cc_best_kb=-1
+            while IFS= read -r cc_dir; do
+                [ -n "$cc_dir" ] || continue
+                cc_kb=$(du -sk "$cc_dir" 2>/dev/null | awk '{print $1}')
+                [ -n "$cc_kb" ] || cc_kb=0
+                if [ "$cc_kb" -gt "$cc_best_kb" ]; then cc_best_kb="$cc_kb"; cc_best="$cc_dir"; fi
+            done <<EOF
+$cc_off_main
+EOF
+            export CCACHE_DIR="$cc_best"
+        elif [ "$cc_count" -eq 1 ]; then
+            export CCACHE_DIR=$(printf '%s' "$cc_off_main" | grep . | head -1)
         else
-            echo "Error: ccache not found. Please install ccache." >&2
+            local cc_best_target cc_best_avail
+            cc_best_target=""
+            cc_best_avail=-1
+            while read -r cc_target cc_avail cc_fstype; do
+                case "$cc_fstype" in
+                    ext2|ext3|ext4|xfs|btrfs|f2fs|zfs|reiserfs|jfs) ;;
+                    *) continue ;;
+                esac
+                [ "$cc_target" = "$cc_root_mount" ] && continue
+                [ -w "$cc_target" ] || continue
+                if [ "${cc_avail:-0}" -gt "$cc_best_avail" ]; then cc_best_avail="$cc_avail"; cc_best_target="$cc_target"; fi
+            done <<EOF
+$(df -k --output=target,avail,fstype 2>/dev/null | tail -n +2)
+EOF
+            if [ -n "$cc_best_target" ]; then
+                export CCACHE_DIR="$cc_best_target/ccache"
+            elif [ -n "$cc_cfg" ]; then
+                export CCACHE_DIR="$cc_cfg"
+            else
+                export CCACHE_DIR="$HOME/.ccache"
+            fi
+            mkdir -p "$CCACHE_DIR" 2>/dev/null
         fi
+
+        echo "ccache directory found, CCACHE_DIR set to: $CCACHE_DIR" >&2
+
+    fi
+
+    if [ -n "${CCACHE_EXEC}" ]; then
+        mkdir -p "${CCACHE_DIR}/tmp" 2>/dev/null
+
+        _ccache_default() { $CCACHE_EXEC -p 2>/dev/null | grep -qE "^\(default\) $1 ="; }
+        _ccache_default max_size && $CCACHE_EXEC -M 40G >/dev/null 2>&1
+        _ccache_default direct_mode && $CCACHE_EXEC -o direct_mode=true >/dev/null 2>&1
+        _ccache_default compression && $CCACHE_EXEC -o compression=true >/dev/null 2>&1
+        _ccache_default inode_cache && $CCACHE_EXEC -o inode_cache=true >/dev/null 2>&1
+        _ccache_default temporary_dir && $CCACHE_EXEC -o temporary_dir="${CCACHE_DIR}/tmp" >/dev/null 2>&1
+        unset -f _ccache_default
+
+        echo "ccache stats (${CCACHE_DIR}):" >&2
+        $CCACHE_EXEC --print-stats 2>/dev/null | awk -F'\t' '
+            { v[$1]=$2 }
+            END {
+                hit = v["direct_cache_hit"] + v["preprocessed_cache_hit"]
+                miss = v["cache_miss"]
+                total = hit + miss
+                if (total > 0)
+                    printf "  hit rate: %.2f%% (%d hits, %d misses)\n", hit * 100.0 / total, hit, miss
+                else
+                    print "  empty (no compiles cached yet)"
+                if (v["cleanups_performed"] + 0 > 0)
+                    printf "  cleanups: %d\n", v["cleanups_performed"]
+            }' >&2
+        $CCACHE_EXEC -s 2>/dev/null | grep -m1 "Cache size" >&2
     fi
 }
 
