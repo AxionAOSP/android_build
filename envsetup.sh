@@ -1338,6 +1338,7 @@ function ax_help() {
     echo -e "${BOLD}Optimizations commands:${RESET}"
     echo -e "  ${YELLOW}setupPerf${RESET}   ${CYAN}enable build optimization${RESET}"
     echo -e "  ${YELLOW}setupSwap${RESET}   ${CYAN}enable 64gb swap${RESET}"
+    echo -e "  ${YELLOW}setupLocalRBE${RESET}   ${CYAN}enable local java/dex build cache (docker)${RESET}"
     echo
     echo -e "${BOLD}Build Types:${RESET}"
     echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
@@ -3101,6 +3102,132 @@ function setupPerf() {
     echo "  java xmx: ${_JAVA_OPTIONS#-Xmx}"
 
     echo "[done]"
+}
+
+function _find_local_rbe_config() {
+    local root_mount target fstype config_file
+    if [ -n "${LOCAL_RBE_CONFIG:-}" ] && [ -r "${LOCAL_RBE_CONFIG}" ]; then
+        printf '%s\n' "$LOCAL_RBE_CONFIG"
+        return
+    fi
+
+    root_mount=$(df -P / 2>/dev/null | awk 'NR==2 {print $NF}')
+
+    while read -r target fstype; do
+        case "$fstype" in
+            ext2|ext3|ext4|xfs|btrfs|f2fs|zfs|reiserfs|jfs) ;;
+            *) continue ;;
+        esac
+        [ "$target" = "$root_mount" ] && continue
+        [ -w "$target" ] || continue
+        config_file="$target/.config/axion/rbe.conf"
+        [ -r "$config_file" ] && printf '%s\n' "$config_file" && return
+    done <<EOF
+$(df --output=target,fstype 2>/dev/null | tail -n +2)
+EOF
+
+    config_file="${XDG_CONFIG_HOME:-$HOME/.config}/axion/rbe.conf"
+    [ -r "$config_file" ] && printf '%s\n' "$config_file"
+}
+
+function _apply_local_rbe_config() {
+    local config_file="$1"
+    local key value
+    [ -r "$config_file" ] || return
+    while IFS='=' read -r key value; do
+        case "$key" in
+            cache_dir) [ -n "${LOCAL_RBE_DIR:-}" ] || LOCAL_RBE_DIR="$value" ;;
+            port) [ -n "${LOCAL_RBE_PORT:-}" ] || LOCAL_RBE_PORT="$value" ;;
+            size_gb) [ -n "${LOCAL_RBE_SIZE_GB:-}" ] || LOCAL_RBE_SIZE_GB="$value" ;;
+            container) [ -n "${LOCAL_RBE_CONTAINER:-}" ] || LOCAL_RBE_CONTAINER="$value" ;;
+            image) [ -n "${LOCAL_RBE_IMAGE:-}" ] || LOCAL_RBE_IMAGE="$value" ;;
+            docker_cmd) [ -n "${LOCAL_RBE_DOCKER:-}" ] || LOCAL_RBE_DOCKER="$value" ;;
+        esac
+    done < "$config_file"
+}
+
+function _load_local_rbe_config() {
+    local config_file
+    config_file=$(_find_local_rbe_config)
+    if [ -n "$config_file" ]; then
+        _apply_local_rbe_config "$config_file"
+        echo "setupLocalRBE: loaded config $config_file" >&2
+    fi
+}
+
+function setupLocalRBE() {
+    _load_local_rbe_config
+
+    local cache_dir="${LOCAL_RBE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/re-cache}"
+    local port="${LOCAL_RBE_PORT:-9092}"
+    local size_gb="${LOCAL_RBE_SIZE_GB:-100}"
+    local container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
+    local image="${LOCAL_RBE_IMAGE:-buchgr/bazel-remote-cache:latest}"
+
+    local docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
+
+    if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${port} "; then
+        echo "setupLocalRBE: cache already serving on localhost:${port}" >&2
+    elif ! command -v ${docker_cmd%% *} &>/dev/null; then
+        echo "setupLocalRBE: no cache on :${port} and docker not found; cannot start cache" >&2
+        return 1
+    elif ! $docker_cmd info >/dev/null 2>&1; then
+        echo "setupLocalRBE: no cache on :${port} and cannot reach the docker daemon." >&2
+        echo "  fix: sudo usermod -aG docker $USER   then log out/in (or run: newgrp docker)" >&2
+        echo "  or:  LOCAL_RBE_DOCKER='sudo docker' setupLocalRBE" >&2
+        return 1
+    else
+        mkdir -p "$cache_dir"
+        if $docker_cmd ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+            echo "setupLocalRBE: cache server already running ($container)" >&2
+        elif $docker_cmd ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+            $docker_cmd start "$container" >/dev/null && echo "setupLocalRBE: started existing $container" >&2
+        else
+            echo "setupLocalRBE: launching $container (bazel-remote ${size_gb}G at ${cache_dir})" >&2
+            $docker_cmd run -d --name "$container" \
+                --restart unless-stopped \
+                --user "$(id -u):$(id -g)" \
+                -v "${cache_dir}:/data" \
+                -p "${port}:9092" \
+                "$image" \
+                --dir /data --max_size "$size_gb" --grpc_address 0.0.0.0:9092 >/dev/null \
+                || { echo "setupLocalRBE: failed to start (try: ${docker_cmd} pull $image)" >&2; return 1; }
+        fi
+    fi
+
+    export USE_RBE=1
+    export USE_REWRAPPER=1
+    export RBE_JAVAC=1 RBE_TURBINE=1 RBE_D8=1 RBE_R8=1
+    export RBE_service="localhost:${port}"
+    export RBE_service_no_security=true
+    export RBE_service_no_auth=true
+    export RBE_use_application_default_credentials=false
+    export RBE_use_gce_credentials=false
+    export RBE_use_rpc_credentials=false
+    export RBE_remote_accept_cache=true
+    export RBE_remote_update_cache=true
+    export RBE_JAVAC_EXEC_STRATEGY=local
+    export RBE_D8_EXEC_STRATEGY=local
+    export RBE_R8_EXEC_STRATEGY=local
+    export RBE_TURBINE_EXEC_STRATEGY=local
+
+    echo "setupLocalRBE: enabled (cache=${RBE_service}, local exec + remote cache)" >&2
+    echo "  build normally; check cache writes with: ${docker_cmd} logs ${container} --tail 20" >&2
+}
+
+function stopLocalRBE() {
+    local container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
+    local docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
+    unset USE_RBE USE_REWRAPPER RBE_JAVAC RBE_TURBINE RBE_D8 RBE_R8 RBE_service \
+          RBE_service_no_security RBE_service_no_auth \
+          RBE_use_application_default_credentials RBE_use_gce_credentials RBE_use_rpc_credentials \
+          RBE_remote_accept_cache RBE_remote_update_cache \
+          RBE_JAVAC_EXEC_STRATEGY RBE_D8_EXEC_STRATEGY RBE_R8_EXEC_STRATEGY RBE_TURBINE_EXEC_STRATEGY
+    if command -v ${docker_cmd%% *} &>/dev/null && $docker_cmd ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+        $docker_cmd stop "$container" >/dev/null && echo "stopLocalRBE: stopped $container, RBE env cleared" >&2
+    else
+        echo "stopLocalRBE: RBE env cleared" >&2
+    fi
 }
 
 function tm() {
