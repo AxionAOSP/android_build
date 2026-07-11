@@ -1394,6 +1394,15 @@ function ax() {
         echo "Setting build variant to $variant"
     fi
 
+    local archive_dir="${ANDROID_BUILD_TOP:-$(pwd)}/ota_archive"
+    local baseline=$(ls "$archive_dir"/*target_files*.zip 2>/dev/null | head -n 1)
+    if [ -n "$baseline" ]; then
+        echo "Baseline target-files ZIP found: $(basename "$baseline")"
+        echo "Building and packaging incremental OTA too..."
+    else
+        echo "No baseline target-files ZIP found. Skipping incremental OTA packaging for this build."
+    fi
+
     m installclean
 
     if [[ -z "$cmd" ]]; then
