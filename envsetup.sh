@@ -1338,7 +1338,8 @@ function ax_help() {
     echo -e "${BOLD}Optimizations commands:${RESET}"
     echo -e "  ${YELLOW}setupPerf${RESET}   ${CYAN}enable build optimization${RESET}"
     echo -e "  ${YELLOW}setupSwap${RESET}   ${CYAN}enable 64gb swap${RESET}"
-    echo -e "  ${YELLOW}setupLocalRBE${RESET}   ${CYAN}enable local java/dex build cache (docker)${RESET}"
+    echo -e "  ${YELLOW}setupRBE${RESET}        ${CYAN}enable local RBE cache${RESET}"
+    echo -e "  ${YELLOW}clearRBECache${RESET}   ${CYAN}discard local RBE action cache${RESET}"
     echo
     echo -e "${BOLD}Build Types:${RESET}"
     echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
@@ -3136,54 +3137,85 @@ function _apply_local_rbe_config() {
     [ -r "$config_file" ] || return
     while IFS='=' read -r key value; do
         case "$key" in
-            cache_dir) [ -n "${LOCAL_RBE_DIR:-}" ] || LOCAL_RBE_DIR="$value" ;;
-            port) [ -n "${LOCAL_RBE_PORT:-}" ] || LOCAL_RBE_PORT="$value" ;;
-            size_gb) [ -n "${LOCAL_RBE_SIZE_GB:-}" ] || LOCAL_RBE_SIZE_GB="$value" ;;
-            container) [ -n "${LOCAL_RBE_CONTAINER:-}" ] || LOCAL_RBE_CONTAINER="$value" ;;
-            image) [ -n "${LOCAL_RBE_IMAGE:-}" ] || LOCAL_RBE_IMAGE="$value" ;;
-            docker_cmd) [ -n "${LOCAL_RBE_DOCKER:-}" ] || LOCAL_RBE_DOCKER="$value" ;;
+            cache_dir) LOCAL_RBE_DIR="$value" ;;
+            port) LOCAL_RBE_PORT="$value" ;;
+            size_gb) LOCAL_RBE_SIZE_GB="$value" ;;
+            container) LOCAL_RBE_CONTAINER="$value" ;;
+            image) LOCAL_RBE_IMAGE="$value" ;;
+            docker_cmd) LOCAL_RBE_DOCKER="$value" ;;
+            local_jobs|jobs) LOCAL_RBE_LOCAL_JOBS="$value" ;;
         esac
     done < "$config_file"
 }
 
 function _load_local_rbe_config() {
     local config_file
+    local caller="${1:-setupRBE}"
     config_file=$(_find_local_rbe_config)
     if [ -n "$config_file" ]; then
         _apply_local_rbe_config "$config_file"
-        echo "setupLocalRBE: loaded config $config_file" >&2
+        echo "$caller: loaded config $config_file" >&2
     fi
 }
 
-function setupLocalRBE() {
+function _clear_rbe_env() {
+    local _t
+
+    for _t in JAVAC TURBINE D8 R8 JAR ZIP SIGNAPK LINT METALAVA CLANG_TIDY ABI_DUMPER ABI_LINKER CXX CXX_LINKS RUST; do
+        unset "RBE_${_t}" "RBE_${_t}_EXEC_STRATEGY" "RBE_${_t}_POOL"
+    done
+    unset USE_RBE USE_REWRAPPER RBE_WRAPPER RBE_DIR RBE_exec_root FLAG_exec_root \
+          RBE_service RBE_instance \
+          RBE_remote_headers NINJA_REMOTE_NUM_JOBS RBE_rpc_timeouts \
+          RBE_canonicalize_working_dir RBE_use_unified_uploads RBE_use_unified_downloads \
+          RBE_compression_threshold RBE_deps_cache_max_mb \
+          RBE_service_no_security RBE_service_no_auth \
+          RBE_use_application_default_credentials RBE_use_gce_credentials RBE_use_rpc_credentials \
+          RBE_remote_accept_cache RBE_remote_update_cache \
+          RBE_JAVA_POOL RBE_CXX_POOL RBE_CXX_LINKS_POOL RBE_CLANG_TIDY_POOL \
+          RBE_METALAVA_POOL RBE_LINT_POOL
+}
+
+function setupRBE() {
+    local LOCAL_RBE_CONFIG="${LOCAL_RBE_CONFIG:-}"
+    local LOCAL_RBE_DIR="${LOCAL_RBE_DIR:-}"
+    local LOCAL_RBE_PORT="${LOCAL_RBE_PORT:-}"
+    local LOCAL_RBE_SIZE_GB="${LOCAL_RBE_SIZE_GB:-}"
+    local LOCAL_RBE_CONTAINER="${LOCAL_RBE_CONTAINER:-}"
+    local LOCAL_RBE_IMAGE="${LOCAL_RBE_IMAGE:-}"
+    local LOCAL_RBE_DOCKER="${LOCAL_RBE_DOCKER:-}"
+    local LOCAL_RBE_LOCAL_JOBS="${LOCAL_RBE_LOCAL_JOBS:-}"
+    local cache_dir port size_gb container image local_jobs docker_cmd
+    local tool
+
     _load_local_rbe_config
 
-    local cache_dir="${LOCAL_RBE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/re-cache}"
-    local port="${LOCAL_RBE_PORT:-9092}"
-    local size_gb="${LOCAL_RBE_SIZE_GB:-100}"
-    local container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
-    local image="${LOCAL_RBE_IMAGE:-buchgr/bazel-remote-cache:latest}"
-
-    local docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
+    cache_dir="${LOCAL_RBE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/re-cache}"
+    port="${LOCAL_RBE_PORT:-9092}"
+    size_gb="${LOCAL_RBE_SIZE_GB:-100}"
+    container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
+    image="${LOCAL_RBE_IMAGE:-buchgr/bazel-remote-cache:latest}"
+    local_jobs="${LOCAL_RBE_LOCAL_JOBS:-$(defaultBuildJobs)}"
+    docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
 
     if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${port} "; then
-        echo "setupLocalRBE: cache already serving on localhost:${port}" >&2
+        echo "setupRBE: cache on localhost:${port}" >&2
     elif ! command -v ${docker_cmd%% *} &>/dev/null; then
-        echo "setupLocalRBE: no cache on :${port} and docker not found; cannot start cache" >&2
+        echo "setupRBE: docker not found; localhost:${port} closed" >&2
         return 1
     elif ! $docker_cmd info >/dev/null 2>&1; then
-        echo "setupLocalRBE: no cache on :${port} and cannot reach the docker daemon." >&2
-        echo "  fix: sudo usermod -aG docker $USER   then log out/in (or run: newgrp docker)" >&2
-        echo "  or:  LOCAL_RBE_DOCKER='sudo docker' setupLocalRBE" >&2
+        echo "setupRBE: docker daemon not reachable" >&2
+        echo "  sudo usermod -aG docker $USER" >&2
+        echo "  LOCAL_RBE_DOCKER='sudo docker' setupRBE" >&2
         return 1
     else
         mkdir -p "$cache_dir"
         if $docker_cmd ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
-            echo "setupLocalRBE: cache server already running ($container)" >&2
+            echo "setupRBE: $container running" >&2
         elif $docker_cmd ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
-            $docker_cmd start "$container" >/dev/null && echo "setupLocalRBE: started existing $container" >&2
+            $docker_cmd start "$container" >/dev/null && echo "setupRBE: started $container" >&2
         else
-            echo "setupLocalRBE: launching $container (bazel-remote ${size_gb}G at ${cache_dir})" >&2
+            echo "setupRBE: start $container (${size_gb}G, ${cache_dir})" >&2
             $docker_cmd run -d --name "$container" \
                 --restart unless-stopped \
                 --user "$(id -u):$(id -g)" \
@@ -3191,13 +3223,17 @@ function setupLocalRBE() {
                 -p "${port}:9092" \
                 "$image" \
                 --dir /data --max_size "$size_gb" --grpc_address 0.0.0.0:9092 >/dev/null \
-                || { echo "setupLocalRBE: failed to start (try: ${docker_cmd} pull $image)" >&2; return 1; }
+                || { echo "setupRBE: start failed; pull $image" >&2; return 1; }
         fi
     fi
 
+    _clear_rbe_env
     export USE_RBE=1
     export USE_REWRAPPER=1
-    export RBE_JAVAC=1 RBE_TURBINE=1 RBE_D8=1 RBE_R8=1
+    for tool in JAVAC TURBINE D8 R8 JAR ZIP SIGNAPK CXX_LINKS ABI_LINKER CLANG_TIDY METALAVA LINT; do
+        export "RBE_${tool}=1"
+        export "RBE_${tool}_EXEC_STRATEGY=local"
+    done
     export RBE_service="localhost:${port}"
     export RBE_service_no_security=true
     export RBE_service_no_auth=true
@@ -3206,28 +3242,110 @@ function setupLocalRBE() {
     export RBE_use_rpc_credentials=false
     export RBE_remote_accept_cache=true
     export RBE_remote_update_cache=true
-    export RBE_JAVAC_EXEC_STRATEGY=local
-    export RBE_D8_EXEC_STRATEGY=local
-    export RBE_R8_EXEC_STRATEGY=local
-    export RBE_TURBINE_EXEC_STRATEGY=local
+    export RBE_canonicalize_working_dir=true
+    export RBE_use_unified_uploads=true
+    export RBE_use_unified_downloads=true
+    export RBE_CXX_EXEC_STRATEGY=local
+    export RBE_JAVA_POOL=default
+    export RBE_CXX_POOL=default
+    export RBE_CXX_LINKS_POOL=default
+    export RBE_CLANG_TIDY_POOL=default
+    export RBE_METALAVA_POOL=default
+    export RBE_LINT_POOL=default
+    export NINJA_REMOTE_NUM_JOBS="$local_jobs"
 
-    echo "setupLocalRBE: enabled (cache=${RBE_service}, local exec + remote cache)" >&2
-    echo "  build normally; check cache writes with: ${docker_cmd} logs ${container} --tail 20" >&2
+    echo "setupRBE: local cache ${RBE_service}, jobs=${local_jobs}" >&2
 }
 
-function stopLocalRBE() {
+function stopRBE() {
+    local LOCAL_RBE_CONFIG="${LOCAL_RBE_CONFIG:-}"
+    local LOCAL_RBE_DIR="${LOCAL_RBE_DIR:-}"
+    local LOCAL_RBE_PORT="${LOCAL_RBE_PORT:-}"
+    local LOCAL_RBE_SIZE_GB="${LOCAL_RBE_SIZE_GB:-}"
+    local LOCAL_RBE_CONTAINER="${LOCAL_RBE_CONTAINER:-}"
+    local LOCAL_RBE_IMAGE="${LOCAL_RBE_IMAGE:-}"
+    local LOCAL_RBE_DOCKER="${LOCAL_RBE_DOCKER:-}"
+    local LOCAL_RBE_LOCAL_JOBS="${LOCAL_RBE_LOCAL_JOBS:-}"
     local container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
     local docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
-    unset USE_RBE USE_REWRAPPER RBE_JAVAC RBE_TURBINE RBE_D8 RBE_R8 RBE_service \
-          RBE_service_no_security RBE_service_no_auth \
-          RBE_use_application_default_credentials RBE_use_gce_credentials RBE_use_rpc_credentials \
-          RBE_remote_accept_cache RBE_remote_update_cache \
-          RBE_JAVAC_EXEC_STRATEGY RBE_D8_EXEC_STRATEGY RBE_R8_EXEC_STRATEGY RBE_TURBINE_EXEC_STRATEGY
+
+    _load_local_rbe_config stopRBE
+    container="${LOCAL_RBE_CONTAINER:-$container}"
+    docker_cmd="${LOCAL_RBE_DOCKER:-$docker_cmd}"
+    _clear_rbe_env
     if command -v ${docker_cmd%% *} &>/dev/null && $docker_cmd ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
-        $docker_cmd stop "$container" >/dev/null && echo "stopLocalRBE: stopped $container, RBE env cleared" >&2
+        $docker_cmd stop "$container" >/dev/null && echo "stopRBE: stopped $container, RBE env cleared" >&2
     else
-        echo "stopLocalRBE: RBE env cleared" >&2
+        echo "stopRBE: RBE env cleared" >&2
     fi
+}
+
+function clearRBECache() {
+    local LOCAL_RBE_CONFIG="${LOCAL_RBE_CONFIG:-}"
+    local LOCAL_RBE_DIR="${LOCAL_RBE_DIR:-}"
+    local LOCAL_RBE_PORT="${LOCAL_RBE_PORT:-}"
+    local LOCAL_RBE_SIZE_GB="${LOCAL_RBE_SIZE_GB:-}"
+    local LOCAL_RBE_CONTAINER="${LOCAL_RBE_CONTAINER:-}"
+    local LOCAL_RBE_IMAGE="${LOCAL_RBE_IMAGE:-}"
+    local LOCAL_RBE_DOCKER="${LOCAL_RBE_DOCKER:-}"
+    local LOCAL_RBE_LOCAL_JOBS="${LOCAL_RBE_LOCAL_JOBS:-}"
+    local cache_dir container docker_cmd
+    local was_running=false
+
+    _load_local_rbe_config clearRBECache
+    cache_dir="${LOCAL_RBE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/re-cache}"
+    container="${LOCAL_RBE_CONTAINER:-bazel-remote-cache}"
+    docker_cmd="${LOCAL_RBE_DOCKER:-docker}"
+
+    case "$cache_dir" in
+        /*) ;;
+        *)
+            echo "clearRBECache: cache directory must be absolute: $cache_dir" >&2
+            return 1
+            ;;
+    esac
+    cache_dir=$(readlink -m -- "$cache_dir") || return 1
+    if [ "$cache_dir" = "/" ]; then
+        echo "clearRBECache: refusing to use the filesystem root" >&2
+        return 1
+    fi
+
+    if pgrep -x ninja >/dev/null 2>&1 ||
+       pgrep -x reproxy >/dev/null 2>&1 ||
+       pgrep -x rewrapper >/dev/null 2>&1 ||
+       pgrep -f '[s]oong_ui' >/dev/null 2>&1; then
+        echo "clearRBECache: stop the active build before clearing the cache" >&2
+        return 1
+    fi
+
+    if ! command -v ${docker_cmd%% *} >/dev/null 2>&1; then
+        echo "clearRBECache: docker not found" >&2
+        return 1
+    fi
+    if ! $docker_cmd info >/dev/null 2>&1; then
+        echo "clearRBECache: docker daemon not reachable" >&2
+        return 1
+    fi
+
+    if $docker_cmd ps --format '{{.Names}}' 2>/dev/null | grep -qx "$container"; then
+        $docker_cmd stop "$container" >/dev/null || return 1
+        was_running=true
+    fi
+
+    if ! rm -rf -- "$cache_dir/ac.v2"; then
+        [ "$was_running" = true ] && $docker_cmd start "$container" >/dev/null
+        echo "clearRBECache: failed to clear $cache_dir/ac.v2" >&2
+        return 1
+    fi
+
+    if [ "$was_running" = true ]; then
+        $docker_cmd start "$container" >/dev/null || {
+            echo "clearRBECache: cleared action cache but failed to restart $container" >&2
+            return 1
+        }
+    fi
+
+    echo "clearRBECache: cleared $cache_dir/ac.v2" >&2
 }
 
 function tm() {
