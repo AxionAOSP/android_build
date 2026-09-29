@@ -554,6 +554,7 @@ include $(BUILD_SYSTEM)/combo/javac.mk
 
 ifeq ($(CALLED_FROM_SETUP),true)
 include $(BUILD_SYSTEM)/ccache.mk
+include $(BUILD_SYSTEM)/jvmcache.mk
 include $(BUILD_SYSTEM)/rbe.mk
 endif
 

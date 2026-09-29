@@ -1693,6 +1693,107 @@ EOF
     fi
 }
 
+function setup_jvmcache() {
+    if [ "$1" = "0" ]; then
+        unset USE_JVMCACHE
+        unset ALTERNATE_JAVAC
+        unset ALTERNATE_KOTLINC
+        unset ALTERNATE_KAPT
+        echo "jvmcache: disabled" >&2
+        return
+    fi
+
+    local T="$(gettop)"
+    local jvmcache_bin=""
+
+    if [ -n "$JVMCACHE_BIN" ] && [ -x "$JVMCACHE_BIN/javac" ]; then
+        jvmcache_bin="$JVMCACHE_BIN"
+    elif [ -n "$JVMCACHE_EXEC" ] && [ -x "$JVMCACHE_EXEC" ]; then
+        jvmcache_bin="$(dirname "$JVMCACHE_EXEC")"
+    elif [ -n "$T" ] && [ -x "$T/prebuilts/jvmcache/linux-x86/bin/javac" ]; then
+        jvmcache_bin="$T/prebuilts/jvmcache/linux-x86/bin"
+    elif [ -n "$T" ] && [ -x "$T/../jvmcache/bin/javac" ]; then
+        jvmcache_bin="$(cd "$T/../jvmcache/bin" && pwd -P)"
+    elif [ -n "$T" ] && [ -x "$T/jvmcache/bin/javac" ]; then
+        jvmcache_bin="$T/jvmcache/bin"
+    elif [ -x "$HOME/.local/bin/javac" ]; then
+        jvmcache_bin="$HOME/.local/bin"
+    elif command -v jvmcache >/dev/null 2>&1; then
+        jvmcache_bin="$(dirname "$(command -v jvmcache)")"
+    fi
+
+    if [ -n "$jvmcache_bin" ] && [ -x "$jvmcache_bin/javac" ]; then
+        export USE_JVMCACHE=true
+        if [ "$RBE_JAVAC" = "1" ] && [ "$RBE_JAVAC_EXEC_STRATEGY" = "remote" ]; then
+            unset ALTERNATE_JAVAC
+            export JAVAC_WRAPPER="$jvmcache_bin/javac"
+        else
+            export ALTERNATE_JAVAC="$jvmcache_bin/javac"
+        fi
+        if [ -x "$jvmcache_bin/kotlinc" ]; then
+            export ALTERNATE_KOTLINC="$jvmcache_bin/kotlinc"
+        fi
+        if [ -x "$jvmcache_bin/kapt" ]; then
+            export ALTERNATE_KAPT="$jvmcache_bin/kapt"
+        fi
+
+        if [ -z "$JVMCACHE_DIR" ] || [ -d "$JVMCACHE_DIR/.git" ] || [[ "$JVMCACHE_DIR" == *"/jvmcache" ]]; then
+            if [ -n "$CCACHE_DIR" ]; then
+                export JVMCACHE_DIR="$(dirname "$CCACHE_DIR")/.jvmcache"
+            elif [ -n "$T" ] && [ -d "$T/../.jvmcache" ]; then
+                export JVMCACHE_DIR="$(cd "$T/.." && pwd -P)/.jvmcache"
+            elif [ -x "$jvmcache_bin/jvmcache" ]; then
+                export JVMCACHE_DIR="$($jvmcache_bin/jvmcache -k cache_dir 2>/dev/null)"
+            fi
+            if [ -z "$JVMCACHE_DIR" ]; then
+                export JVMCACHE_DIR="$HOME/.cache/jvmcache"
+            fi
+        fi
+        mkdir -p "$JVMCACHE_DIR" 2>/dev/null
+
+        local jvmcache_exec="$jvmcache_bin/jvmcache"
+        if [ ! -x "$jvmcache_exec" ]; then
+            jvmcache_exec="$(command -v jvmcache 2>/dev/null)"
+        fi
+
+        echo "jvmcache stats (${JVMCACHE_DIR}):" >&2
+        if [ -x "$jvmcache_exec" ]; then
+            local max_mb="$($jvmcache_exec -k max_size 2>/dev/null)"
+            JVMCACHE_DIR="$JVMCACHE_DIR" $jvmcache_exec -s 2>/dev/null | awk -v max_mb="${max_mb:-5120}" '
+                /Cache hits:/ { hits = $3 }
+                /Cache misses:/ { misses = $3 }
+                /Cache hit rate:/ { rate = $4 }
+                /Direct passthrough:/ { passthrough = $3 }
+                /Stored artifact size:/ { size_mb = $4 }
+                END {
+                    total = hits + misses
+                    if (total > 0) {
+                        printf "  hit rate: %s (%d hits, %d misses)\n", rate, hits, misses
+                    } else {
+                        print "  empty (no compiles cached yet)"
+                    }
+                    if (passthrough != "" && passthrough + 0 > 0) {
+                        printf "  direct passthrough: %d\n", passthrough
+                    }
+                    if (size_mb != "") {
+                        size_num = size_mb + 0
+                        max_num = max_mb + 0
+                        if (max_num > 0) {
+                            pct = (size_num / max_num) * 100.0
+                            if (max_num >= 1024) {
+                                printf "  Cache size (GB):    %.2f /  %.2f (%.2f %%)\n", size_num / 1024.0, max_num / 1024.0, pct
+                            } else {
+                                printf "  Cache size (MB):    %.2f /  %.2f (%.2f %%)\n", size_num, max_num, pct
+                            }
+                        }
+                    }
+                }' >&2
+        else
+            echo "  enabled (stats unavailable)" >&2
+        fi
+    fi
+}
+
 function generate_keys() {
     local subject="/C=US/ST=California/L=Los Angeles/O=AxionOS/OU=AxionOS/CN=AxionOS"
     echo "Subject string: $subject"
@@ -3347,6 +3448,29 @@ function clearRBECache() {
     fi
 
     echo "clearRBECache: cleared $cache_dir/ac.v2" >&2
+}
+
+function clearJVMCache() {
+    local T="$(gettop)"
+    local jvmcache_exec="${ALTERNATE_JAVAC:-}"
+    if [ -z "$jvmcache_exec" ]; then
+        if [ -n "$T" ] && [ -x "$T/jvmcache/bin/javac" ]; then
+            jvmcache_exec="$T/jvmcache/bin/javac"
+        elif [ -n "$T" ] && [ -x "$T/../jvmcache/bin/javac" ]; then
+            jvmcache_exec="$T/../jvmcache/bin/javac"
+        elif command -v jvmcache >/dev/null 2>&1; then
+            jvmcache_exec="$(command -v jvmcache)"
+        fi
+    fi
+
+    if [ -x "$jvmcache_exec" ]; then
+        "$jvmcache_exec" --clear
+    elif [ -n "$JVMCACHE_DIR" ] && [ -d "$JVMCACHE_DIR" ]; then
+        rm -rf "$JVMCACHE_DIR/objects" "$JVMCACHE_DIR/tmp" "$JVMCACHE_DIR/stats.json"
+        echo "clearJVMCache: cleared $JVMCACHE_DIR" >&2
+    else
+        echo "clearJVMCache: jvmcache not active or not found" >&2
+    fi
 }
 
 function tm() {
