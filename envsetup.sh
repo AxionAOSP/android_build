@@ -1340,6 +1340,7 @@ function ax_help() {
     echo -e "  ${YELLOW}setupSwap${RESET}   ${CYAN}enable 64gb swap${RESET}"
     echo -e "  ${YELLOW}setupRBE${RESET}        ${CYAN}enable local RBE cache${RESET}"
     echo -e "  ${YELLOW}clearRBECache${RESET}   ${CYAN}discard local RBE action cache${RESET}"
+    echo -e "  ${YELLOW}skipGlobs${RESET}       ${CYAN}skip ninja globs (1/0)${RESET}"
     echo
     echo -e "${BOLD}Build Types:${RESET}"
     echo -e "  ${YELLOW}-b${RESET}   ${CYAN}Bacon${RESET}"
@@ -3356,6 +3357,18 @@ function tm() {
         echo "$REPO_PATH"
       fi
     ' 2>/dev/null
+}
+
+function skipGlobs() {
+    if [ "$1" = "1" ]; then
+        export SOONG_SKIP_GLOBS=1
+        echo "Ninja globs: disabled"
+    elif [ "$1" = "0" ]; then
+        unset SOONG_SKIP_GLOBS
+        echo "Ninja globs: enabled"
+    else
+        echo "Usage: skipGlobs 1/0"
+    fi
 }
 
 setup_keys
