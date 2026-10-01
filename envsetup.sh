@@ -3509,6 +3509,7 @@ function skipGlobs() {
 
 setup_keys
 setup_ccache
+setup_jvmcache
 validate_current_shell
 set_global_paths
 source_vendorsetup
