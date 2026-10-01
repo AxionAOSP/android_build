@@ -68,6 +68,9 @@ ifneq ($(filter true 1,$(USE_JVMCACHE)),)
     ifndef ALTERNATE_R8
       ALTERNATE_R8 := $(JVMCACHE_BIN_DIR)/r8
     endif
+    ifndef ALTERNATE_TURBINE
+      ALTERNATE_TURBINE := $(JVMCACHE_BIN_DIR)/turbine
+    endif
 
     USE_JVMCACHE := true
   endif

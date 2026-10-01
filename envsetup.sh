@@ -1699,6 +1699,9 @@ function setup_jvmcache() {
         unset ALTERNATE_JAVAC
         unset ALTERNATE_KOTLINC
         unset ALTERNATE_KAPT
+        unset ALTERNATE_D8
+        unset ALTERNATE_R8
+        unset ALTERNATE_TURBINE
         echo "jvmcache: disabled" >&2
         return
     fi
@@ -1735,6 +1738,15 @@ function setup_jvmcache() {
         fi
         if [ -x "$jvmcache_bin/kapt" ]; then
             export ALTERNATE_KAPT="$jvmcache_bin/kapt"
+        fi
+        if [ -x "$jvmcache_bin/d8" ]; then
+            export ALTERNATE_D8="$jvmcache_bin/d8"
+        fi
+        if [ -x "$jvmcache_bin/r8" ]; then
+            export ALTERNATE_R8="$jvmcache_bin/r8"
+        fi
+        if [ -x "$jvmcache_bin/turbine" ]; then
+            export ALTERNATE_TURBINE="$jvmcache_bin/turbine"
         fi
 
         if [ -z "$JVMCACHE_DIR" ] || [ -d "$JVMCACHE_DIR/.git" ] || [[ "$JVMCACHE_DIR" == *"/jvmcache" ]]; then
