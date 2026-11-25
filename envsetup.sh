@@ -1585,10 +1585,61 @@ function bKernel() {
         return 1
     fi
 
-    echo "Building kernel, boot, vendor, and module images for $target_device..."
-    if ! m bootimage vendorbootimage vendor_dlkmimage vendorimage "$@"; then
-        echo "Error: Kernel, vendor, and modules build failed."
-        return 1
+    local out_dir="out/target/product/$target_device"
+    local target_kernel_device="$(get_build_var TARGET_KERNEL_DEVICE)"
+    local target_kernel_source="$(get_build_var TARGET_KERNEL_PLATFORM_SOURCE)"
+    local target_kernel_dir="$(get_build_var TARGET_KERNEL_DIR)"
+
+    if [[ -n "$target_kernel_device" && -n "$target_kernel_source" ]]; then
+        echo "Detected Pixel Bazel kernel target ($target_kernel_device / $target_kernel_source)."
+        echo "Running bk to compile kernel and update prebuilts..."
+        if ! bk; then
+            echo "Error: Pixel Bazel kernel build (bk) failed."
+            return 1
+        fi
+
+        if [[ -n "$target_kernel_dir" && -d "${ANDROID_BUILD_TOP}/${target_kernel_dir}" ]]; then
+            touch "${ANDROID_BUILD_TOP}/${target_kernel_dir}/"* 2>/dev/null
+        fi
+
+        echo "Cleaning stale kernel and module images in $out_dir..."
+        rm -rf "$out_dir/boot.img" \
+               "$out_dir/dtbo.img" \
+               "$out_dir/dtb.img" \
+               "$out_dir/vendor_boot.img" \
+               "$out_dir/vendor_kernel_boot.img" \
+               "$out_dir/vendor_dlkm.img" \
+               "$out_dir/system_dlkm.img" \
+               "$out_dir/vendor_dlkm" \
+               "$out_dir/system_dlkm" \
+               "$out_dir/vendor_kernel_ramdisk" \
+               "$out_dir/vendor_ramdisk" \
+               "$out_dir/obj/PACKAGING/prebuilt_bootimg_intermediates" \
+               "$out_dir/obj/PACKAGING/depmod_"*
+
+        local make_targets=(bootimage vendorbootimage vendor_dlkmimage vendorimage)
+        if [[ -n "$target_kernel_dir" && -f "${ANDROID_BUILD_TOP}/${target_kernel_dir}/dtbo.img" ]]; then
+            make_targets+=("$out_dir/dtbo.img")
+        fi
+        if [[ -n "$(get_build_var BOARD_VENDOR_KERNEL_BOOTIMAGE_PARTITION_SIZE)" ]] || \
+           [[ "$(get_build_var PRODUCT_BUILD_VENDOR_KERNEL_BOOT_IMAGE)" == "true" ]]; then
+            make_targets+=(vendorkernelbootimage)
+        fi
+        if [[ "$(get_build_var BOARD_USES_SYSTEM_DLKMIMAGE)" == "true" ]]; then
+            make_targets+=(system_dlkmimage)
+        fi
+
+        echo "Repackaging AOSP images (${make_targets[*]}) for $target_device..."
+        if ! m "${make_targets[@]}" "$@"; then
+            echo "Error: Kernel, vendor, and modules image packaging failed."
+            return 1
+        fi
+    else
+        echo "Building kernel, boot, vendor, and module images for $target_device..."
+        if ! m bootimage vendorbootimage vendor_dlkmimage vendorimage "$@"; then
+            echo "Error: Kernel, vendor, and modules build failed."
+            return 1
+        fi
     fi
     echo "Kernel, vendor, and modules build succeeded!"
 }
@@ -1605,7 +1656,9 @@ function iKernel() {
     local boot_img="$out_dir/boot.img"
     local dtbo_img="$out_dir/dtbo.img"
     local vendor_boot_img="$out_dir/vendor_boot.img"
+    local vendor_kernel_boot_img="$out_dir/vendor_kernel_boot.img"
     local vendor_dlkm_img="$out_dir/vendor_dlkm.img"
+    local system_dlkm_img="$out_dir/system_dlkm.img"
     local vendor_img="$out_dir/vendor.img"
 
     if [[ ! -f "$boot_img" ]]; then
@@ -1614,7 +1667,7 @@ function iKernel() {
     fi
 
     local has_dynamic=false
-    if [[ -f "$vendor_dlkm_img" ]] || [[ -f "$vendor_img" ]]; then
+    if [[ -f "$vendor_dlkm_img" ]] || [[ -f "$system_dlkm_img" ]] || [[ -f "$vendor_img" ]]; then
         has_dynamic=true
     fi
 
@@ -1681,9 +1734,19 @@ function iKernel() {
         fastboot flash vendor_boot "$vendor_boot_img"
     fi
 
+    if [[ -f "$vendor_kernel_boot_img" ]]; then
+        echo "Flashing vendor_kernel_boot partition: $vendor_kernel_boot_img"
+        fastboot flash vendor_kernel_boot "$vendor_kernel_boot_img"
+    fi
+
     if [[ -f "$vendor_dlkm_img" ]]; then
         echo "Flashing vendor_dlkm partition: $vendor_dlkm_img"
         fastboot flash vendor_dlkm "$vendor_dlkm_img"
+    fi
+
+    if [[ -f "$system_dlkm_img" ]]; then
+        echo "Flashing system_dlkm partition: $system_dlkm_img"
+        fastboot flash system_dlkm "$system_dlkm_img"
     fi
 
     if [[ -f "$vendor_img" ]]; then
